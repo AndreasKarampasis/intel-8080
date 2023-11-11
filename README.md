@@ -10,3 +10,4 @@ The Intel 8080 is the second 8-bit microprocessor designed and manufactured by I
 - Memory: intel 8080 can access *64KB* (65,536 bytes) of memory.
 - A 16-bit *program counter*, called PC, and whose contents indicate the address of the next instruction to be executed.
 - A 16-bit *stack pointer* (SP), which maintains the address of the next available stack location in memory.
+- A 256x224 screen display
