@@ -1,22 +1,78 @@
+// TODO: Move all the operation implementations to a different file.
 const MEMORY_SIZE: usize = 65_536;
+// I decided to use an array of 8 registers so that I can get the specified register directly from the opcode byte.
+// So I have to make sure that the register[M_REF] is never used as a register.
+const REGISTER_NUM: usize = 8;
+const REG_B: usize = 0x00; // 0b0000_0000
+const REG_C: usize = 0x01; // 0b0000_0001
+const REG_D: usize = 0x02; // 0b0000_0010
+const REG_E: usize = 0x03; // 0b0000_0011
+const REG_H: usize = 0x04; // 0b0000_0100
+const REG_L: usize = 0x05; // 0b0000_0101
+const REG_A: usize = 0x07; // 0b0000_0111
+const M_REF: u8 = 0x06; // 0b0000_0110
 
+struct ConditionCodes {
+    s: u8,  // Set if the result of an operation is zero.
+    z: u8,  // Set if the MS bit of the result is 1, indicating a negative number.
+    p: u8,  // Parity flag
+    cy: u8, // Carry flag
+    ac: u8, // Auxiliary carry flag
+}
 pub struct Intel8080 {
-    //regs: [u8; NUM_REGS],
+    b: u8,
+    c: u8,
+    d: u8,
+    e: u8,
+    h: u8,
+    l: u8,
+    a: u8,
+    registers: [u8; REGISTER_NUM],
     memory: [u8; MEMORY_SIZE],
     pc: u16,
-    //    sp: u16,
-    //cc: ConditionCodes,
+    sp: u16,
+    cc: ConditionCodes,
     // int_enable: bool,
+}
+
+impl ConditionCodes {
+    fn new() -> Self {
+        Self {
+            s: 0,
+            z: 0,
+            p: 0,
+            cy: 0,
+            ac: 0,
+        }
+    }
+}
+
+// Utility function to calculate parity
+fn is_parity_even(byte: u8) -> bool {
+    let mut count = 0;
+    for i in 0..8 {
+        if (byte & (1 << i)) != 0 {
+            count += 1;
+        }
+    }
+    (count % 2) == 0
 }
 
 impl Intel8080 {
     pub fn new() -> Self {
         Self {
-            //            regs: [0; NUM_REGS],
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            h: 0,
+            l: 0,
+            a: 0,
+            registers: [0; REGISTER_NUM],
             memory: [0; MEMORY_SIZE],
             pc: 0,
-            //           sp: 0,
-            //            cc: ConditionCodes::new(),
+            sp: 0,
+            cc: ConditionCodes::new(),
             //            int_enable: false,
         }
     }
@@ -40,633 +96,232 @@ impl Intel8080 {
         // Fetch
         let op: u8 = self.fetch();
         // Decode && Execute
-        self.pc += self.execute(op);
+        self.execute(op);
+    }
+
+    // Update Zero, Sign, and Parity flags based on the contents of a register
+    // Carry Flag (CY) and Auxiliary Carry Flag (AC) are not updated here
+    // They are usually updated after specific arithmetic or logical operations
+    fn update_flags(&mut self, byte: u8) {
+        // Update zero flag
+        self.cc.z = if byte == 0 { 1 } else { 0 };
+        // Sign flag
+        self.cc.s = if (byte & 0b1000_0000) != 0 { 1 } else { 0 };
+        // Parity Flag
+        self.cc.p = if is_parity_even(byte) { 1 } else { 0 };
     }
 
     // TODO: use array of function pointers for better visibility
-    pub fn execute(&mut self, op: u8) -> u16 {
+    pub fn execute(&mut self, op: u8) {
         print!("{:#06X} {:02X} ", self.pc, op);
-        let mut op_bytes = 1;
         match op {
-            0x00 => {
-                println!("NOP");
-            }
-            0x01 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("LXI B, ${:#02X}{:#02X}", byte3, byte2);
-            }
-            0x02 => {
-                println!("STAX B");
-            }
-            0x03 => {
-                println!("INX B");
-            }
-            0x04 => {
-                println!("INR B");
-            }
-            0x05 => {
-                println!("DCR B");
-            }
-            0x06 => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI B, #${:02X}", byte2);
-            }
-            0x07 => {
-                println!("RLC B");
-            }
-            0x08 => {
-                println!("NOP");
-            }
-            0x09 => {
-                println!("DAD B");
-            }
-            0x0a => {
-                println!("LDAX B");
-            }
-            0x0b => {
-                println!("DCX B");
-            }
-            0x0c => {
-                println!("INR C");
-            }
-            0x0d => {
-                println!("DCR C");
-            }
-            0x0e => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI C, #${:02X}", byte2);
-            }
-            0x0f => {
-                println!("RRC");
-            }
-            0x10 => {
-                println!("NOP");
-            }
-            0x11 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("LXI D, #${:02X}{:02X}", byte3, byte2);
-            }
-            0x12 => {
-                println!("STAX D");
-            }
-            0x13 => {
-                println!("INX D");
-            }
-            0x14 => {
-                println!("INR D");
-            }
-            0x15 => {
-                println!("DCR D");
-            }
-            0x16 => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI D, #${:02X}", byte2);
-            }
-            0x17 => {
-                println!("RAL");
-            }
-            0x18 => {
-                println!("NOP");
-            }
-            0x19 => {
-                println!("DAD D");
-            }
-            0x1a => {
-                println!("LDAX D");
-            }
-            0x1b => {
-                println!("DCX D");
-            }
-            0x1c => {
-                println!("INR E");
-            }
-            0x1d => {
-                println!("DCR E");
-            }
-            0x1e => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI E, #${:02X}", byte2);
-            }
-            0x1f => {
-                println!("RAR");
-            }
-            0x20 => {
-                println!("NOP");
-            }
-            0x21 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("LXI H, #${:02X}{:02X}", byte3, byte2);
-            }
-            0x22 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("SHLD #{:02X}{:02X}", byte3, byte2);
-            }
-            0x23 => {
-                println!("INX H");
-            }
-            0x24 => {
-                println!("INR H");
-            }
-            0x25 => {
-                println!("DCR H");
-            }
-            0x26 => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI H, #${:02X}", byte2);
-            }
-            0x27 => {
-                println!("DAA");
-            }
-            0x28 => {
-                println!("NOP");
-            }
-            0x29 => {
-                println!("DAD H");
-            }
-            0x2a => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("LHLD #{:02X}{:02X}", byte3, byte2);
-            }
-            0x2b => {
-                println!("DCX H");
-            }
-            0x2c => {
-                println!("INR L");
-            }
-            0x2d => {
-                println!("DCR L");
-            }
-            0x2e => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI L, #${:02X}", byte2);
-            }
-            0x2f => {
-                println!("CMA");
-            }
-            0x30 => {
-                println!("NOP");
-            }
-            0x31 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("LXI SP,  #{:02X}{:02X}", byte3, byte2);
-            }
-            0x32 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("STA  #{:02X}{:02X}", byte3, byte2);
-            }
-            0x33 => {
-                println!("INX SP");
-            }
-            0x34 => {
-                println!("INX M");
-            }
-            0x35 => {
-                println!("DCR M");
-            }
-            0x36 => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI M, #${:02X}", byte2);
-            }
-            0x37 => {
-                println!("STC");
-            }
-            0x38 => {
-                println!("NOP");
-            }
-            0x39 => {
-                println!("DAD SP");
-            }
-            0x3a => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("LDA ${:02X}{:02X}", byte3, byte2);
-            }
-            0x3b => {
-                println!("DCX SP");
-            }
-            0x3c => {
-                println!("INR A");
-            }
-            0x3d => {
-                println!("DCR A");
-            }
-            0x3e => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("MVI A, #${:02X}", byte2);
-            }
-            0x3f => {
-                println!("CMC");
-            }
-            0x40 => {
-                println!("MOV B, B");
-            }
-            0x41 => {
-                println!("MOV B, C");
-            }
-            0x42 => {
-                println!("MOV B, D");
-            }
-            0x43 => {
-                println!("MOV B, E");
-            }
-            0x44 => {
-                println!("MOV B, H");
-            }
-            0x45 => {
-                println!("MOV B, L");
-            }
-            0x46 => {
-                println!("MOV B, M");
-            }
-            0x47 => {
-                println!("MOV B, A");
-            }
-            0x48 => {
-                println!("MOV C, B");
-            }
-            0x49 => {
-                println!("MOV C, C");
-            }
-            0x4a => {
-                println!("MOV C, D");
-            }
-            0x4b => {
-                println!("MOV C, E");
-            }
-            0x4c => {
-                println!("MOV C, H");
-            }
-            0x4d => {
-                println!("MOV C, L");
-            }
-            0x4e => {
-                println!("MOV C, M");
-            }
-            0x4f => {
-                println!("MOV C, A");
-            }
-            0x50 => {
-                println!("MOV D, B");
-            }
-            0x51 => {
-                println!("MOV D, C");
-            }
-            0x52 => {
-                println!("MOV D, D");
-            }
-            0x53 => {
-                println!("MOV D, E");
-            }
-            0x54 => {
-                println!("MOV D, H");
-            }
-            0x55 => {
-                println!("MOV D, L");
-            }
-            0x56 => {
-                println!("MOV D, M");
-            }
-            0x57 => {
-                println!("MOV D, A");
-            }
-            0x58 => {
-                println!("MOV E, B");
-            }
-            0x59 => {
-                println!("MOV E, C");
-            }
-            0x5a => {
-                println!("MOV E, D");
-            }
-            0x5b => {
-                println!("MOV E, E");
-            }
-            0x5c => {
-                println!("MOV E, H");
-            }
-            0x5d => {
-                println!("MOV E, L");
-            }
-            0x5e => {
-                println!("MOV E, M");
-            }
-            0x5f => {
-                println!("MOV E, A");
-            }
-            0x60 => {
-                println!("MOV H, B");
-            }
-            0x61 => {
-                println!("MOV H, C");
-            }
-            0x62 => {
-                println!("MOV H, D");
-            }
-            0x63 => {
-                println!("MOV H, E");
-            }
-            0x64 => {
-                println!("MOV H, H");
-            }
-            0x65 => {
-                println!("MOV H, L");
-            }
-            0x66 => {
-                println!("MOV H, M");
-            }
-            0x67 => {
-                println!("MOV H, A");
-            }
-            0x68 => {
-                println!("MOV L, B");
-            }
-            0x69 => {
-                println!("MOV L, C");
-            }
-            0x6a => {
-                println!("MOV L, D");
-            }
-            0x6b => {
-                println!("MOV L, E");
-            }
-            0x6c => {
-                println!("MOV L, H");
-            }
-            0x6d => {
-                println!("MOV L, L");
-            }
-            0x6e => {
-                println!("MOV L, M");
-            }
-            0x6f => {
-                println!("MOV L, A");
-            }
-            0x70 => {
-                println!("MOV M, B");
-            }
-            0x71 => {
-                println!("MOV M, C");
-            }
-            0x72 => {
-                println!("MOV M, D");
-            }
-            0x73 => {
-                println!("MOV M, E");
-            }
-            0x74 => {
-                println!("MOV M, H");
-            }
-            0x75 => {
-                println!("MOV M, L");
-            }
-            0x76 => {
-                println!("HLT");
-            }
-            0x77 => {
-                println!("MOV M, A");
-            }
-            0x78 => {
-                println!("MOV A, B");
-            }
-            0x79 => {
-                println!("MOV A, C");
-            }
-            0x7a => {
-                println!("MOV A, D");
-            }
-            0x7b => {
-                println!("MOV A, E");
-            }
-            0x7c => {
-                println!("MOV A, H");
-            }
-            0x7d => {
-                println!("MOV A, L");
-            }
-            0x7e => {
-                println!("MOV A, M");
-            }
-            0x7f => {
-                println!("MOV A, A");
-            }
-            0x80 => {
-                println!("ADD B");
-            }
-            0x81 => {
-                println!("ADD C");
-            }
-            0x82 => {
-                println!("ADD D");
-            }
-            0x83 => {
-                println!("ADD E");
-            }
-            0x84 => {
-                println!("ADD H");
-            }
-            0x85 => {
-                println!("ADD L");
-            }
-            0x86 => {
-                println!("ADD M");
-            }
-            0x87 => {
-                println!("ADD A");
-            }
-            0x88 => {
-                println!("ADC B");
-            }
-            0x89 => {
-                println!("ADC C");
-            }
-            0x8a => {
-                println!("ADC D");
-            }
-            0x8b => {
-                println!("ADC E");
-            }
-            0x8c => {
-                println!("ADC H");
-            }
-            0x8d => {
-                println!("ADC L");
-            }
-            0x8e => {
-                println!("ADC M");
-            }
-            0x8f => {
-                println!("ADC A");
-            }
-            0x90 => {
-                println!("SUB B");
-            }
-            0x91 => {
-                println!("SUB C");
-            }
-            0x92 => {
-                println!("SUB D");
-            }
-            0x93 => {
-                println!("SUB E");
-            }
-            0x94 => {
-                println!("SUB H");
-            }
-            0x95 => {
-                println!("SUB L");
-            }
-            0x96 => {
-                println!("SUB M");
-            }
-            0x97 => {
-                println!("SUB A");
-            }
-            0x98 => {
-                println!("SBB B");
-            }
-            0x99 => {
-                println!("SBB C");
-            }
-            0x9a => {
-                println!("SBB D");
-            }
-            0x9b => {
-                println!("SBB E");
-            }
-            0x9c => {
-                println!("SBB H");
-            }
-            0x9d => {
-                println!("SBB L");
-            }
-            0x9e => {
-                println!("SBB M");
-            }
-            0x9f => {
-                println!("SBB A");
-            }
-            0xa0 => {
-                println!("ANA B");
-            }
-            0xa1 => {
-                println!("ANA C");
-            }
-            0xa2 => {
-                println!("ANA D");
-            }
-            0xa3 => {
-                println!("ANA E");
-            }
-            0xa4 => {
-                println!("ANA H");
-            }
-            0xa5 => {
-                println!("ANA L");
-            }
-            0xa6 => {
-                println!("ANA M");
-            }
-            0xa7 => {
-                println!("ANA A");
-            }
-            0xa8 => {
-                println!("XRA B");
-            }
-            0xa9 => {
-                println!("XRA C");
-            }
-            0xaa => {
-                println!("XRA D");
-            }
-            0xab => {
-                println!("XRA E");
-            }
-            0xac => {
-                println!("XRA H");
-            }
-            0xad => {
-                println!("XRA L");
-            }
-            0xae => {
-                println!("XRA M");
-            }
+            0x00 => {}
+            0x01 => self.op_lxi_b(),
+            0x02 => unimplemented!("Error: Unimplemented opcode."),
+            0x03 => unimplemented!("Error: Unimplemented opcode."),
+            0x04 => unimplemented!("Error: Unimplemented opcode."),
+            0x05 => self.op_dcr(),
+            0x06 => self.op_mvi_b(),
+            0x07 => unimplemented!("Error: Unimplemented opcode."),
+            0x08 => unimplemented!("Error: Unimplemented opcode."),
+            0x09 => self.op_dad(),
+            0x0a => unimplemented!("Error: Unimplemented opcode."),
+            0x0b => unimplemented!("Error: Unimplemented opcode."),
+            0x0c => unimplemented!("Error: Unimplemented opcode."),
+            0x0d => self.op_dcr(),
+            0x0e => self.op_mvi_c(),
+            0x0f => self.op_rrc(),
+
+            0x10 => unimplemented!("Error: Unimplemented opcode."),
+            0x11 => self.op_lxi_d(),
+            0x12 => unimplemented!("Error: Unimplemented opcode."),
+            0x13 => self.op_inx_d(),
+            0x14 => unimplemented!("Error: Unimplemented opcode."),
+            0x15 => unimplemented!("Error: Unimplemented opcode."),
+            0x16 => unimplemented!("Error: Unimplemented opcode."),
+            0x17 => unimplemented!("Error: Unimplemented opcode."),
+            0x18 => unimplemented!("Error: Unimplemented opcode."),
+            0x19 => self.op_dad(),
+            0x1a => self.op_ldax_d(),
+            0x1b => unimplemented!("Error: Unimplemented opcode."),
+            0x1c => unimplemented!("Error: Unimplemented opcode."),
+            0x1d => unimplemented!("Error: Unimplemented opcode."),
+            0x1e => unimplemented!("Error: Unimplemented opcode."),
+            0x1f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x20 => unimplemented!("Error: Unimplemented opcode."),
+            0x21 => self.op_lxi_h(),
+            0x22 => unimplemented!("Error: Unimplemented opcode."),
+            0x23 => self.op_inx_h(),
+            0x24 => unimplemented!("Error: Unimplemented opcode."),
+            0x25 => unimplemented!("Error: Unimplemented opcode."),
+            0x26 => self.op_mvi_h(),
+            0x27 => unimplemented!("Error: Unimplemented opcode."),
+            0x28 => unimplemented!("Error: Unimplemented opcode."),
+            0x29 => self.op_dad(),
+            0x2a => unimplemented!("Error: Unimplemented opcode."),
+            0x2b => unimplemented!("Error: Unimplemented opcode."),
+            0x2c => unimplemented!("Error: Unimplemented opcode."),
+            0x2d => unimplemented!("Error: Unimplemented opcode."),
+            0x2e => unimplemented!("Error: Unimplemented opcode."),
+            0x2f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x30 => unimplemented!("Error: Unimplemented opcode."),
+            0x31 => self.op_lxi_sp(),
+            0x32 => self.op_sta(),
+            0x33 => unimplemented!("Error: Unimplemented opcode."),
+            0x34 => unimplemented!("Error: Unimplemented opcode."),
+            0x35 => unimplemented!("Error: Unimplemented opcode."),
+            0x36 => self.op_mvi_m(),
+            0x37 => unimplemented!("Error: Unimplemented opcode."),
+            0x38 => unimplemented!("Error: Unimplemented opcode."),
+            0x39 => self.op_dad(),
+            0x3a => self.op_lda(),
+            0x3b => unimplemented!("Error: Unimplemented opcode."),
+            0x3c => unimplemented!("Error: Unimplemented opcode."),
+            0x3d => unimplemented!("Error: Unimplemented opcode."),
+            0x3e => self.op_mvi_a(),
+            0x3f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x40 => unimplemented!("Error: Unimplemented opcode."),
+            0x41 => unimplemented!("Error: Unimplemented opcode."),
+            0x42 => unimplemented!("Error: Unimplemented opcode."),
+            0x43 => unimplemented!("Error: Unimplemented opcode."),
+            0x44 => unimplemented!("Error: Unimplemented opcode."),
+            0x45 => unimplemented!("Error: Unimplemented opcode."),
+            0x46 => unimplemented!("Error: Unimplemented opcode."),
+            0x47 => unimplemented!("Error: Unimplemented opcode."),
+            0x48 => unimplemented!("Error: Unimplemented opcode."),
+            0x49 => unimplemented!("Error: Unimplemented opcode."),
+            0x4a => unimplemented!("Error: Unimplemented opcode."),
+            0x4b => unimplemented!("Error: Unimplemented opcode."),
+            0x4c => unimplemented!("Error: Unimplemented opcode."),
+            0x4d => unimplemented!("Error: Unimplemented opcode."),
+            0x4e => unimplemented!("Error: Unimplemented opcode."),
+            0x4f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x50 => unimplemented!("Error: Unimplemented opcode."),
+            0x51 => unimplemented!("Error: Unimplemented opcode."),
+            0x52 => unimplemented!("Error: Unimplemented opcode."),
+            0x53 => unimplemented!("Error: Unimplemented opcode."),
+            0x54 => unimplemented!("Error: Unimplemented opcode."),
+            0x55 => unimplemented!("Error: Unimplemented opcode."),
+            0x56 => self.op_mov(),
+            0x57 => unimplemented!("Error: Unimplemented opcode."),
+            0x58 => unimplemented!("Error: Unimplemented opcode."),
+            0x59 => unimplemented!("Error: Unimplemented opcode."),
+            0x5a => unimplemented!("Error: Unimplemented opcode."),
+            0x5b => unimplemented!("Error: Unimplemented opcode."),
+            0x5c => unimplemented!("Error: Unimplemented opcode."),
+            0x5d => unimplemented!("Error: Unimplemented opcode."),
+            0x5e => self.op_mov(),
+            0x5f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x60 => unimplemented!("Error: Unimplemented opcode."),
+            0x61 => unimplemented!("Error: Unimplemented opcode."),
+            0x62 => unimplemented!("Error: Unimplemented opcode."),
+            0x63 => unimplemented!("Error: Unimplemented opcode."),
+            0x64 => unimplemented!("Error: Unimplemented opcode."),
+            0x65 => unimplemented!("Error: Unimplemented opcode."),
+            0x66 => self.op_mov(),
+            0x67 => unimplemented!("Error: Unimplemented opcode."),
+            0x68 => unimplemented!("Error: Unimplemented opcode."),
+            0x69 => unimplemented!("Error: Unimplemented opcode."),
+            0x6a => unimplemented!("Error: Unimplemented opcode."),
+            0x6b => unimplemented!("Error: Unimplemented opcode."),
+            0x6c => unimplemented!("Error: Unimplemented opcode."),
+            0x6d => unimplemented!("Error: Unimplemented opcode."),
+            0x6e => unimplemented!("Error: Unimplemented opcode."),
+            0x6f => self.op_mov(),
+
+            0x70 => unimplemented!("Error: Unimplemented opcode."),
+            0x71 => unimplemented!("Error: Unimplemented opcode."),
+            0x72 => unimplemented!("Error: Unimplemented opcode."),
+            0x73 => unimplemented!("Error: Unimplemented opcode."),
+            0x74 => unimplemented!("Error: Unimplemented opcode."),
+            0x75 => unimplemented!("Error: Unimplemented opcode."),
+            0x76 => unimplemented!("Error: Unimplemented opcode."),
+            0x77 => self.op_mov(),
+            0x78 => unimplemented!("Error: Unimplemented opcode."),
+            0x79 => unimplemented!("Error: Unimplemented opcode."),
+            0x7a => self.op_mov(),
+            0x7b => self.op_mov(),
+            0x7c => self.op_mov(),
+            0x7d => unimplemented!("Error: Unimplemented opcode."),
+            0x7e => self.op_mov(),
+            0x7f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x80 => unimplemented!("Error: Unimplemented opcode."),
+            0x81 => unimplemented!("Error: Unimplemented opcode."),
+            0x82 => unimplemented!("Error: Unimplemented opcode."),
+            0x83 => unimplemented!("Error: Unimplemented opcode."),
+            0x84 => unimplemented!("Error: Unimplemented opcode."),
+            0x85 => unimplemented!("Error: Unimplemented opcode."),
+            0x86 => unimplemented!("Error: Unimplemented opcode."),
+            0x87 => unimplemented!("Error: Unimplemented opcode."),
+            0x88 => unimplemented!("Error: Unimplemented opcode."),
+            0x89 => unimplemented!("Error: Unimplemented opcode."),
+            0x8a => unimplemented!("Error: Unimplemented opcode."),
+            0x8b => unimplemented!("Error: Unimplemented opcode."),
+            0x8c => unimplemented!("Error: Unimplemented opcode."),
+            0x8d => unimplemented!("Error: Unimplemented opcode."),
+            0x8e => unimplemented!("Error: Unimplemented opcode."),
+            0x8f => unimplemented!("Error: Unimplemented opcode."),
+
+            0x90 => unimplemented!("Error: Unimplemented opcode."),
+            0x91 => unimplemented!("Error: Unimplemented opcode."),
+            0x92 => unimplemented!("Error: Unimplemented opcode."),
+            0x93 => unimplemented!("Error: Unimplemented opcode."),
+            0x94 => unimplemented!("Error: Unimplemented opcode."),
+            0x95 => unimplemented!("Error: Unimplemented opcode."),
+            0x96 => unimplemented!("Error: Unimplemented opcode."),
+            0x97 => unimplemented!("Error: Unimplemented opcode."),
+            0x98 => unimplemented!("Error: Unimplemented opcode."),
+            0x99 => unimplemented!("Error: Unimplemented opcode."),
+            0x9a => unimplemented!("Error: Unimplemented opcode."),
+            0x9b => unimplemented!("Error: Unimplemented opcode."),
+            0x9c => unimplemented!("Error: Unimplemented opcode."),
+            0x9d => unimplemented!("Error: Unimplemented opcode."),
+            0x9e => unimplemented!("Error: Unimplemented opcode."),
+            0x9f => unimplemented!("Error: Unimplemented opcode."),
+
+            0xa0 => unimplemented!("Error: Unimplemented opcode."),
+            0xa1 => unimplemented!("Error: Unimplemented opcode."),
+            0xa2 => unimplemented!("Error: Unimplemented opcode."),
+            0xa3 => unimplemented!("Error: Unimplemented opcode."),
+            0xa4 => unimplemented!("Error: Unimplemented opcode."),
+            0xa5 => unimplemented!("Error: Unimplemented opcode."),
+            0xa6 => unimplemented!("Error: Unimplemented opcode."),
+            0xa7 => self.op_ana(),
+            0xa8 => unimplemented!("Error: Unimplemented opcode."),
+            0xa9 => unimplemented!("Error: Unimplemented opcode."),
+            0xaa => unimplemented!("Error: Unimplemented opcode."),
+            0xab => unimplemented!("Error: Unimplemented opcode."),
+            0xac => unimplemented!("Error: Unimplemented opcode."),
+            0xad => unimplemented!("Error: Unimplemented opcode."),
+            0xae => unimplemented!("Error: Unimplemented opcode."),
             0xaf => {
                 println!("XRA A");
             }
-            0xb0 => {
-                println!("ORA B");
-            }
-            0xb1 => {
-                println!("ORA C");
-            }
-            0xb2 => {
-                println!("ORA D");
-            }
-            0xb3 => {
-                println!("ORA E");
-            }
-            0xb4 => {
-                println!("ORA H");
-            }
-            0xb5 => {
-                println!("ORA L");
-            }
-            0xb6 => {
-                println!("ORA M");
-            }
-            0xb7 => {
-                println!("ORA A");
-            }
-            0xb8 => {
-                println!("CMP B");
-            }
-            0xb9 => {
-                println!("CMP C");
-            }
-            0xba => {
-                println!("CMP D");
-            }
-            0xbb => {
-                println!("CMP E");
-            }
-            0xbc => {
-                println!("CMP H");
-            }
-            0xbd => {
-                println!("CMP L");
-            }
-            0xbe => {
-                println!("CMP M");
-            }
-            0xbf => {
-                println!("CMP A");
-            }
-            0xc0 => {
-                println!("RNZ");
-            }
+
+            0xb0 => unimplemented!("Error: Unimplemented opcode."),
+            0xb1 => unimplemented!("Error: Unimplemented opcode."),
+            0xb2 => unimplemented!("Error: Unimplemented opcode."),
+            0xb3 => unimplemented!("Error: Unimplemented opcode."),
+            0xb4 => unimplemented!("Error: Unimplemented opcode."),
+            0xb5 => unimplemented!("Error: Unimplemented opcode."),
+            0xb6 => unimplemented!("Error: Unimplemented opcode."),
+            0xb7 => unimplemented!("Error: Unimplemented opcode."),
+            0xb8 => unimplemented!("Error: Unimplemented opcode."),
+            0xb9 => unimplemented!("Error: Unimplemented opcode."),
+            0xba => unimplemented!("Error: Unimplemented opcode."),
+            0xbb => unimplemented!("Error: Unimplemented opcode."),
+            0xbc => unimplemented!("Error: Unimplemented opcode."),
+            0xbd => unimplemented!("Error: Unimplemented opcode."),
+            0xbe => unimplemented!("Error: Unimplemented opcode."),
+            0xbf => unimplemented!("Error: Unimplemented opcode."),
+
+            0xc0 => unimplemented!("Error: Unimplemented opcode."),
             0xc1 => {
                 println!("POP B");
             }
@@ -682,12 +337,7 @@ impl Intel8080 {
                 let byte3 = self.memory[(self.pc as usize) + 2];
                 println!("JMP ${:02X}{:02X}", byte3, byte2);
             }
-            0xc4 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CNZ ${:02X}{:02X}", byte3, byte2);
-            }
+            0xc4 => unimplemented!("Error: Unimplemented opcode."),
             0xc5 => {
                 println!("PUSH B");
             }
@@ -696,133 +346,55 @@ impl Intel8080 {
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("ADI #{:02X}", byte2);
             }
-            0xc7 => {
-                println!("RST 0");
-            }
-            0xc8 => {
-                println!("RZ");
-            }
+            0xc7 => unimplemented!("Error: Unimplemented opcode."),
+            0xc8 => unimplemented!("Error: Unimplemented opcode."),
             0xc9 => {
                 println!("RET");
             }
-            0xca => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JZ ${:02X}{:02X}", byte3, byte2);
-            }
-            0xcb => {
-                println!("NOP");
-            }
-            0xcc => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CZ ${:02X}{:02X}", byte3, byte2);
-            }
+            0xca => unimplemented!("Error: Unimplemented opcode."),
+            0xcb => unimplemented!("Error: Unimplemented opcode."),
+            0xcc => unimplemented!("Error: Unimplemented opcode."),
             0xcd => {
                 op_bytes = 3;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 let byte3 = self.memory[(self.pc as usize) + 2];
                 println!("CALL ${:02X}{:02X}", byte3, byte2);
             }
-            0xce => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("ACI #{:02X}", byte2);
-            }
-            0xcf => {
-                println!("RST");
-            }
-            0xd0 => {
-                println!("RNC");
-            }
+            0xce => unimplemented!("Error: Unimplemented opcode."),
+            0xcf => unimplemented!("Error: Unimplemented opcode."),
+
+            0xd0 => unimplemented!("Error: Unimplemented opcode."),
             0xd1 => {
                 println!("POP D");
             }
-            0xd2 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JNC ${:02X}{:02X}", byte3, byte2);
-            }
+            0xd2 => unimplemented!("Error: Unimplemented opcode."),
             0xd3 => {
                 op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("OUT #{:02X}", byte2);
             }
-            0xd4 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CNC ${:02X}{:02X}", byte3, byte2);
-            }
+            0xd4 => unimplemented!("Error: Unimplemented opcode."),
             0xd5 => {
                 println!("PUSH D");
             }
-            0xd6 => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("SUI #{:03X}", byte2);
-            }
-            0xd7 => {
-                println!("RST 2");
-            }
-            0xd8 => {
-                println!("RC");
-            }
-            0xd9 => {
-                println!("NOP");
-            }
-            0xda => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JC ${:02X}{:02X}", byte3, byte2);
-            }
-            0xdb => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("IN #{:03X}", byte2);
-            }
-            0xdc => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CC ${:02X}{:02X}", byte3, byte2);
-            }
-            0xdd => {
-                println!("NOP");
-            }
-            0xde => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("SBI #{:03X}", byte2);
-            }
-            0xdf => {
-                println!("RST 3");
-            }
-            0xe0 => {
-                println!("RPO");
-            }
+            0xd6 => unimplemented!("Error: Unimplemented opcode."),
+            0xd7 => unimplemented!("Error: Unimplemented opcode."),
+            0xd8 => unimplemented!("Error: Unimplemented opcode."),
+            0xd9 => unimplemented!("Error: Unimplemented opcode."),
+            0xda => unimplemented!("Error: Unimplemented opcode."),
+            0xdb => unimplemented!("Error: Unimplemented opcode."),
+            0xdc => unimplemented!("Error: Unimplemented opcode."),
+            0xdd => unimplemented!("Error: Unimplemented opcode."),
+            0xde => unimplemented!("Error: Unimplemented opcode."),
+            0xdf => unimplemented!("Error: Unimplemented opcode."),
+
+            0xe0 => unimplemented!("Error: Unimplemented opcode."),
             0xe1 => {
                 println!("POP H");
             }
-            0xe2 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JPO ${:02X}{:02X}", byte3, byte2);
-            }
-            0xe3 => {
-                println!("XTHL");
-            }
-            0xe4 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CPO ${:02X}{:02X}", byte3, byte2);
-            }
+            0xe2 => unimplemented!("Error: Unimplemented opcode."),
+            0xe3 => unimplemented!("Error: Unimplemented opcode."),
+            0xe4 => unimplemented!("Error: Unimplemented opcode."),
             0xe5 => {
                 println!("PUSH H");
             }
@@ -831,107 +403,314 @@ impl Intel8080 {
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("ANI #{:03X}", byte2);
             }
-            0xe7 => {
-                println!("RST 4");
-            }
-            0xe8 => {
-                println!("RPE");
-            }
-            0xe9 => {
-                println!("PCHL");
-            }
-            0xea => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JPE ${:02X}{:02X}", byte3, byte2);
-            }
+            0xe7 => unimplemented!("Error: Unimplemented opcode."),
+            0xe8 => unimplemented!("Error: Unimplemented opcode."),
+            0xe9 => unimplemented!("Error: Unimplemented opcode."),
+            0xea => unimplemented!("Error: Unimplemented opcode."),
             0xeb => {
                 println!("XCHG");
             }
-            0xec => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CPE ${:02X}{:02X}", byte3, byte2);
-            }
-            0xed => {
-                println!("NOP");
-            }
-            0xee => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("XRI #{:03X}", byte2);
-            }
-            0xef => {
-                println!("RST 5");
-            }
-            0xf0 => {
-                println!("RP");
-            }
+            0xec => unimplemented!("Error: Unimplemented opcode."),
+            0xed => unimplemented!("Error: Unimplemented opcode."),
+            0xee => unimplemented!("Error: Unimplemented opcode."),
+            0xef => unimplemented!("Error: Unimplemented opcode."),
+
+            0xf0 => unimplemented!("Error: Unimplemented opcode."),
             0xf1 => {
                 println!("POP PSW");
             }
-            0xf2 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JP ${:02X}{:02X}", byte3, byte2);
-            }
-            0xf3 => {
-                println!("DI");
-            }
-            0xf4 => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CP ${:02X}{:02X}", byte3, byte2);
-            }
+            0xf2 => unimplemented!("Error: Unimplemented opcode."),
+            0xf3 => unimplemented!("Error: Unimplemented opcode."),
+            0xf4 => unimplemented!("Error: Unimplemented opcode."),
             0xf5 => {
                 println!("PUSH PSW");
             }
-            0xf6 => {
-                op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("ORI #{:03X}", byte2);
-            }
-            0xf7 => {
-                println!("RST 6");
-            }
-            0xf8 => {
-                println!("RM");
-            }
-            0xf9 => {
-                println!("SPHL");
-            }
-            0xfa => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JM ${:02X}{:02X}", byte3, byte2);
-            }
+            0xf6 => unimplemented!("Error: Unimplemented opcode."),
+            0xf7 => unimplemented!("Error: Unimplemented opcode."),
+            0xf8 => unimplemented!("Error: Unimplemented opcode."),
+            0xf9 => unimplemented!("Error: Unimplemented opcode."),
+            0xfa => unimplemented!("Error: Unimplemented opcode."),
             0xfb => {
                 println!("EI");
             }
-            0xfc => {
-                op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CM ${:02X}{:02X}", byte3, byte2);
-            }
-            0xfd => {
-                println!("NOP");
-            }
+            0xfc => unimplemented!("Error: Unimplemented opcode."),
+            0xfd => unimplemented!("Error: Unimplemented opcode."),
             0xfe => {
                 op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("CPI #{:03X}", byte2);
             }
-            0xff => {
-                println!("RST 7");
-            }
-            _ => unimplemented!("Unimplemented opcode: {:#02X}", op),
+            0xff => unimplemented!("Error: Unimplemented opcode."),
         }
-        op_bytes
+        self.pc += 1;
+    }
+
+    fn op_lxi_b(&mut self) {
+        // B <- byte3, C <- byte2
+        let byte2 = self.memory[(self.pc as usize) + 1];
+        let byte3 = self.memory[(self.pc as usize) + 2];
+        self.b = byte3;
+        self.c = byte2;
+        self.pc += 3;
+    }
+
+    fn op_mvi(&mut self) {}
+
+    fn op_mvi_b(&mut self) {
+        // B <- byte2
+        let byte2 = self.memory[(self.pc as usize) + 1];
+        self.b = byte2;
+        self.pc += 2;
+    }
+
+    fn op_mvi_c(&mut self) {
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        self.c = byte2;
+        self.pc += 2;
+    }
+
+    fn op_mvi_h(&mut self) {
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        self.h = byte2;
+        self.pc += 2;
+    }
+
+    /// The byte of immediate data is stored in the specified memory byte
+    /// Condition bits affected: None
+    fn op_mvi_m(&mut self) {
+        let byte2: u8 = self.memory[(self.pc + 1) as usize];
+        let offset: u16 = ((self.h as u16) << 8) | (self.l as u16);
+        self.memory[offset as usize] = byte2;
+        self.pc += 2;
+    }
+
+    /// The byte of immediate data is stored in the accumulator
+    /// Condition bits affected: None
+    fn op_mvi_a(&mut self) {
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        self.a = byte2;
+        self.pc += 2;
+    }
+
+    /// Description: Rotate Accumulator Right: The carry bit is set equal to the LS
+    /// of the accumulator. The contents of the accumulator are rotated
+    /// one bit position to the right, with the LSB being transffered
+    /// to the MSB position of the accumulator.
+    fn op_rrc(&mut self) {
+        self.cc.cy = self.a & 0b0000_0001;
+        self.a = (self.a >> 1) | (self.cc.cy << 7);
+    }
+
+    /// This instruction loads the register pair DE with a 16-bit
+    /// address formed by the immediate 8-bit values in the next
+    /// two memory locations.
+    fn op_lxi_d(&mut self) {
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        let byte3 = self.memory[(self.pc + 2) as usize];
+        self.d = byte3;
+        self.e = byte2;
+        self.pc += 3;
+    }
+
+    fn op_inx_d(&mut self) {
+        let de_reg_pair = ((self.d as u16) << 8) | (self.e as u16);
+        let sum = de_reg_pair + 1;
+        self.d = ((sum & 0xFF00) >> 8) as u8;
+        self.e = (sum & 0x00FF) as u8;
+    }
+
+    /// Load accumulator with the contents of the memory location DE
+    fn op_ldax_d(&mut self) {
+        let de = ((self.d as u16) << 8) | (self.e as u16);
+        // What happens if offset is out of memory bounds?
+        self.a = self.memory[de as usize];
+    }
+
+    fn op_lxi_h(&mut self) {
+        // H <- byte 3, L <- byte 2
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        let byte3 = self.memory[(self.pc + 2) as usize];
+        self.h = byte3;
+        self.l = byte2;
+        self.pc += 3;
+    }
+
+    /// Increments the HL register pair.
+    fn op_inx_h(&mut self) {
+        let hl_reg_pair = ((self.h as u16) << 8) | (self.l as u16);
+        let sum = hl_reg_pair + 1;
+        self.h = ((sum & 0xFF00) >> 8) as u8;
+        self.l = (sum & 0x00FF) as u8;
+    }
+
+    fn op_lxi_sp(&mut self) {
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        let byte3 = self.memory[(self.pc + 2) as usize];
+        self.sp = ((byte3 as u16) << 8) | (byte2 as u16);
+        self.pc += 3;
+    }
+
+    /// Description: The contents of the accumulaltor replace
+    /// the byte at the memory address formed by concatenating
+    /// HI ADD with LOW ADD
+    /// Condition bits affected: None
+    fn op_sta(&mut self) {
+        let lo = self.memory[(self.pc + 1) as usize];
+        let hi = self.memory[(self.pc + 2) as usize];
+
+        let offset = ((hi as u16) << 8) | (lo as u16);
+        self.memory[offset as usize] = self.a;
+        self.pc += 3;
+    }
+
+    /// Description: The byte at the memory address formed
+    /// by concatenating HI ADD with LOW ADD replaces the
+    /// contents of the accumulator.
+    /// Condition bits affected: None
+    fn op_lda(&mut self) {
+        let lo = self.memory[(self.pc + 1) as usize];
+        let hi = self.memory[(self.pc + 2) as usize];
+
+        let offset = ((hi as u16) << 8) | (lo as u16);
+        self.a = self.memory[offset as usize];
+
+        self.pc += 3;
+    }
+
+    /// Description: One byte of data is moved from the register specified by src to
+    /// the dst register. The data replaces the contents of the destination
+    /// register; the source remains unchanged.
+    /// Condition bits affected: None
+    fn op_mov(&mut self) {
+        let byte = self.memory[self.pc as usize];
+        let src_reg = byte & 0b0000_0111;
+        let dst_reg = (byte & 0b0011_1000) >> 3;
+
+        if dst_reg == M_REF {
+            let offset: u16 =
+                ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+            self.memory[offset as usize] = self.registers[src_reg as usize];
+        } else if src_reg == M_REF {
+            let offset: u16 =
+                ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+            self.registers[src_reg as usize] = self.memory[offset as usize];
+        } else {
+            self.registers[dst_reg as usize] = self.registers[src_reg as usize];
+        }
+    }
+
+    /// Description: If the Carry bit is 0, it is set to 1. If the Carry bit = 1,
+    /// it is reset to 0.
+    /// Condition bits affected: Carry
+    fn op_cmc(&mut self) {
+        self.cc.cy ^= 1;
+    }
+
+    /// Description: The Carry bit is set to one
+    /// Condition bits affected: Carry
+    fn op_stc(&mut self) {
+        self.cc.cy = 0x01;
+    }
+
+    /// Description: The specified register or memory byte is incremented by one.
+    /// Condition bits affected: Zero, SIgn, Parity, Auxiliary Carry
+    fn op_inr(&mut self) {
+        let reg = (self.memory[self.pc as usize] & 0b0011_1000) >> 3;
+        if reg == M_REF {
+            let offset: u16 =
+                ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+            let (sum, carry) = self.memory[offset as usize].overflowing_add(1);
+            self.memory[offset as usize] = sum;
+            self.update_flags(self.memory[offset as usize]);
+            self.cc.cy = if carry { 1 } else { 0 };
+        } else {
+            let (sum, carry) = self.registers[reg as usize].overflowing_add(1);
+            self.memory[reg as usize] = sum;
+            self.update_flags(self.registers[reg as usize]);
+            self.cc.cy = if carry { 1 } else { 0 };
+        }
+    }
+
+    /// Description: The specified register or memory byte is decremented by one.
+    /// Condition bits affected: Zero, Sign, Parity, Auxiliary Carry
+    fn op_dcr(&mut self) {
+        // B <- B - 1
+        let op = self.memory[self.pc as usize];
+        let reg = (op & 0b0011_1000) >> 3;
+
+        if reg == M_REF {
+            let offset: u16 =
+                ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+            self.memory[offset as usize] = self.memory[offset as usize].wrapping_sub(1);
+            self.update_flags(self.memory[offset as usize]);
+            self.cc.cy = 0;
+        } else {
+            self.registers[reg as usize] = self.registers[reg as usize].wrapping_sub(1);
+            self.update_flags(self.registers[reg as usize]);
+            self.cc.cy = 0;
+        }
+    }
+
+    /// Description: Each bit of the contents of the accumulator is
+    /// complemented.
+    /// Condition bits affected: None
+    fn op_cma(&mut self) {
+        self.registers[REG_A] = !self.registers[REG_A];
+    }
+
+    /// The 16-bit number in the specified register pair is added
+    /// to the 16-bit number held in the H and L registers using
+    /// two's complement arithmetic. The result replaces the contents
+    /// of the H and L registers.
+    /// Condition bits affected: Carry (cy)
+    fn op_dad(&mut self) {
+        let op: u8 = self.memory[self.pc as usize];
+        let reg_pair: u8 = (op & 0b0011_0000) >> 4;
+        let hl: u16 = ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+        let mut sum: u16 = 0;
+        let mut carry: bool = false;
+
+        match reg_pair {
+            0b00 => {
+                let bc: u16 =
+                    ((self.registers[REG_B] as u16) << 8) | (self.registers[REG_C] as u16);
+                (sum, carry) = hl.overflowing_add(bc);
+            }
+            0b01 => {
+                let de: u16 =
+                    ((self.registers[REG_D] as u16) << 8) | (self.registers[REG_E] as u16);
+                (sum, carry) = hl.overflowing_add(de);
+            }
+            0b10 => {
+                (sum, carry) = hl.overflowing_add(hl);
+            }
+            0b11 => {
+                (sum, carry) = hl.overflowing_add(self.sp);
+            }
+            _ => {
+                unreachable!();
+            }
+        }
+        self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
+        self.registers[REG_L] = (sum & 0x00FF) as u8;
+        self.cc.cy = if carry { 1 } else { 0 };
+    }
+
+    /// Description: The specified byte is logically ANDed bit by bit
+    /// with the contents of the accumulator. The carry bit is reset to zero
+    /// Condition bits affected: Carry, Zero, Sign, Parity
+    fn op_ana(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg = op & 0b0000_0111;
+
+        if reg == M_REF {
+            let offset: u16 =
+                ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+            self.registers[REG_A] &= self.memory[offset as usize];
+        } else {
+            self.registers[REG_A] &= self.registers[reg as usize];
+        }
+        self.update_flags(self.registers[REG_A]);
+        self.cc.cy = 0;
     }
 }
