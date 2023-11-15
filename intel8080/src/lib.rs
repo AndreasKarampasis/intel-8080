@@ -17,7 +17,7 @@ struct ConditionCodes {
     z: u8,  // Set if the MS bit of the result is 1, indicating a negative number.
     p: u8,  // Parity flag
     cy: u8, // Carry flag
-    ac: u8, // Auxiliary carry flag
+    ac: u8, // Auxiliary carry flag, (space invaders doesn't use it)
 }
 pub struct Intel8080 {
     b: u8,
@@ -300,9 +300,7 @@ impl Intel8080 {
             0xac => unimplemented!("Error: Unimplemented opcode."),
             0xad => unimplemented!("Error: Unimplemented opcode."),
             0xae => unimplemented!("Error: Unimplemented opcode."),
-            0xaf => {
-                println!("XRA A");
-            }
+            0xaf => self.op_xra(),
 
             0xb0 => unimplemented!("Error: Unimplemented opcode."),
             0xb1 => unimplemented!("Error: Unimplemented opcode."),
@@ -322,9 +320,7 @@ impl Intel8080 {
             0xbf => unimplemented!("Error: Unimplemented opcode."),
 
             0xc0 => unimplemented!("Error: Unimplemented opcode."),
-            0xc1 => {
-                println!("POP B");
-            }
+            0xc1 => self.op_pop(),
             0xc2 => {
                 op_bytes = 3;
                 let byte2 = self.memory[(self.pc as usize) + 1];
@@ -364,9 +360,7 @@ impl Intel8080 {
             0xcf => unimplemented!("Error: Unimplemented opcode."),
 
             0xd0 => unimplemented!("Error: Unimplemented opcode."),
-            0xd1 => {
-                println!("POP D");
-            }
+            0xd1 => self.op_pop(),
             0xd2 => unimplemented!("Error: Unimplemented opcode."),
             0xd3 => {
                 op_bytes = 2;
@@ -389,9 +383,7 @@ impl Intel8080 {
             0xdf => unimplemented!("Error: Unimplemented opcode."),
 
             0xe0 => unimplemented!("Error: Unimplemented opcode."),
-            0xe1 => {
-                println!("POP H");
-            }
+            0xe1 => self.op_pop(),
             0xe2 => unimplemented!("Error: Unimplemented opcode."),
             0xe3 => unimplemented!("Error: Unimplemented opcode."),
             0xe4 => unimplemented!("Error: Unimplemented opcode."),
@@ -416,9 +408,7 @@ impl Intel8080 {
             0xef => unimplemented!("Error: Unimplemented opcode."),
 
             0xf0 => unimplemented!("Error: Unimplemented opcode."),
-            0xf1 => {
-                println!("POP PSW");
-            }
+            0xf1 => self.op_pop(),
             0xf2 => unimplemented!("Error: Unimplemented opcode."),
             0xf3 => unimplemented!("Error: Unimplemented opcode."),
             0xf4 => unimplemented!("Error: Unimplemented opcode."),
@@ -712,5 +702,66 @@ impl Intel8080 {
         }
         self.update_flags(self.registers[REG_A]);
         self.cc.cy = 0;
+    }
+
+    /// Description: The specified byte is EXCLUSIVE-ORed but by bit
+    /// with the contents of the accumulator. The Carry bit is reset to zero
+    /// Condition bits affected: Carry, Zero, Sign, Parity, Auxiliary Carry
+    fn op_xra(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg = op & 0x0000_0111;
+
+        match reg {
+            M_REF => {
+                let offset: u16 =
+                    ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+                self.registers[REG_A] ^= self.memory[offset as usize];
+            }
+            _ => {
+                self.registers[REG_A] ^= self.registers[reg as usize];
+            }
+        }
+        self.update_flags(self.registers[REG_A]);
+        // TODO: update ac flag in the future? probably not gonna happen
+        self.cc.cy = 0;
+    }
+
+    /// Description: The contents of the specified register pair are
+    /// restored from two bytes of memory indicated by the stack pointer SP.
+    /// The byte of data at the memory address indicated by the stack pointer
+    /// is loaded into the second register of the register pair; the byte of
+    /// data at the address one greater than the address indicated by the stack
+    /// pointer is loaded into the first register pair. If register pair PSW is
+    /// specified, the byte of data indicated by the contents of the stack
+    /// pointer plus one is used to restore the values of the five condition bits
+    /// Condition bits affected: If register pair PSW is specified, Carry, Sign
+    /// Zero, Parity and Auxiliary Carry may be changed. Other wise, none affected
+    fn op_pop(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg_pair = (op & 0b0011_0000) >> 4;
+        match reg_pair {
+            0b00 => {
+                self.registers[REG_B] = self.memory[(self.sp + 1) as usize];
+                self.registers[REG_C] = self.memory[self.sp as usize];
+            }
+            0b01 => {
+                self.registers[REG_D] = self.memory[(self.sp + 1) as usize];
+                self.registers[REG_E] = self.memory[self.sp as usize];
+            }
+            0b10 => {
+                self.registers[REG_H] = self.memory[(self.sp + 1) as usize];
+                self.registers[REG_L] = self.memory[self.sp as usize];
+            }
+            0b11 => {
+                self.registers[REG_A] = self.memory[(self.sp + 1) as usize];
+                let psw = self.memory[self.sp as usize];
+                self.cc.s = (psw & 0b1000_0000) >> 7;
+                self.cc.z = (psw & 0b0100_0000) >> 6;
+                self.cc.ac = (psw & 0b0001_0000) >> 4;
+                self.cc.p = (psw & 0b0000_0100) >> 2;
+                self.cc.cy = psw & 0b0000_0001;
+            }
+        }
+        self.sp += 2;
     }
 }
