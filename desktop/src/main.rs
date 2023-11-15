@@ -11,10 +11,5 @@ fn main() {
     rom.read_to_end(&mut buffer).unwrap();
     cpu.load(&buffer);
 
-    cpu.tick();
-    cpu.print_state();
-    cpu.tick();
-    cpu.print_state();
-    cpu.tick();
-    cpu.print_state();
+    cpu.test();
 }

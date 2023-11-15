@@ -77,6 +77,13 @@ impl Intel8080 {
         }
     }
 
+    pub fn test(&mut self) {
+        self.registers[REG_A] = 0b1111_0010;
+        self.print_state();
+        self.op_rlc();
+        self.print_state();
+    }
+
     pub fn print_state(&self) {
         println!("opcode: {:#04X}", self.memory[self.pc as usize]);
         println!("        CPU Misc. Field State");
@@ -92,31 +99,31 @@ impl Intel8080 {
         println!("REGISTER |DEC\t|HEX\t|BIN               |");
         println!("-------------------------------------------|");
         println!(
-            "A        |{}\t|{:#06X}\t|{:#018b}|",
+            "A        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_A], self.registers[REG_A], self.registers[REG_A]
         );
         println!(
-            "B        |{}\t|{:#06X}\t|{:#018b}|",
+            "B        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_B], self.registers[REG_B], self.registers[REG_B]
         );
         println!(
-            "C        |{}\t|{:#06X}\t|{:#018b}|",
+            "C        |{}\t|{:#06X}\t|{:#09b}         |",
             self.registers[REG_C], self.registers[REG_C], self.registers[REG_C]
         );
         println!(
-            "D        |{}\t|{:#06X}\t|{:#018b}|",
+            "D        |{}\t|{:#06X}\t|{:#09b}         |",
             self.registers[REG_D], self.registers[REG_D], self.registers[REG_D]
         );
         println!(
-            "E        |{}\t|{:#06X}\t|{:#018b}|",
+            "E        |{}\t|{:#06X}\t|{:#09b}         |",
             self.registers[REG_E], self.registers[REG_E], self.registers[REG_E]
         );
         println!(
-            "H        |{}\t|{:#06X}\t|{:#018b}|",
+            "H        |{}\t|{:#06X}\t|{:#09b}         |",
             self.registers[REG_H], self.registers[REG_H], self.registers[REG_H]
         );
         println!(
-            "L        |{}\t|{:#06X}\t|{:#018b}|",
+            "L        |{}\t|{:#06X}\t|{:#09b}         |",
             self.registers[REG_L], self.registers[REG_L], self.registers[REG_L]
         );
         println!("-------------------------------------------|");
@@ -177,7 +184,7 @@ impl Intel8080 {
             0x04 => self.op_inr(),
             0x05 => self.op_dcr(),
             0x06 => self.op_mvi_b(),
-            0x07 => unimplemented!("Error: Unimplemented opcode."),
+            0x07 => self.op_rlc(),
             0x08 => unimplemented!("Error: Unimplemented opcode."),
             0x09 => self.op_dad(),
             0x0a => unimplemented!("Error: Unimplemented opcode."),
@@ -536,15 +543,6 @@ impl Intel8080 {
         self.pc += 2;
     }
 
-    /// Description: Rotate Accumulator Right: The carry bit is set equal to the LS
-    /// of the accumulator. The contents of the accumulator are rotated
-    /// one bit position to the right, with the LSB being transffered
-    /// to the MSB position of the accumulator.
-    fn op_rrc(&mut self) {
-        self.cc.cy = self.a & 0b0000_0001;
-        self.a = (self.a >> 1) | (self.cc.cy << 7);
-    }
-
     /// This instruction loads the register pair DE with a 16-bit
     /// address formed by the immediate 8-bit values in the next
     /// two memory locations.
@@ -592,6 +590,24 @@ impl Intel8080 {
         let byte3 = self.memory[(self.pc + 2) as usize];
         self.sp = ((byte3 as u16) << 8) | (byte2 as u16);
         self.pc += 3;
+    }
+
+    /// Description: Rotate Accumulator Left: The carry bit is set equal
+    /// to the MS of the accumulator. The contents of the accumulator are
+    /// rotated one bit position to the left, with the MSB being transffered
+    /// to the LSB position of the accumulator.
+    fn op_rlc(&mut self) {
+        self.cc.cy = (self.registers[REG_A] & 0b1000_0000) >> 7;
+        self.registers[REG_A] = (self.registers[REG_A] << 1) | self.cc.cy;
+    }
+
+    /// Description: Rotate Accumulator Right: The carry bit is set equal to the LS
+    /// of the accumulator. The contents of the accumulator are rotated
+    /// one bit position to the right, with the LSB being transffered
+    /// to the MSB position of the accumulator.
+    fn op_rrc(&mut self) {
+        self.cc.cy = self.registers[REG_A] & 0b0000_0001;
+        self.registers[REG_A] = (self.registers[REG_A] >> 1) | (self.cc.cy << 7);
     }
 
     /// Description: The contents of the accumulaltor replace
