@@ -10,10 +10,11 @@ fn main() {
 
     rom.read_to_end(&mut buffer).unwrap();
     cpu.load(&buffer);
-    println!("{:#x}", buffer.len());
 
-    // TODO: This is just for testing
-    while cpu.get_pc() < (buffer.len() as u16) {
-        cpu.tick();
-    }
+    cpu.tick();
+    cpu.print_state();
+    cpu.tick();
+    cpu.print_state();
+    cpu.tick();
+    cpu.print_state();
 }

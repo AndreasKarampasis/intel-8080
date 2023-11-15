@@ -1,6 +1,6 @@
-// TODO: Move all the operation implementations to a different file.
 const MEMORY_SIZE: usize = 65_536;
-// I decided to use an array of 8 registers so that I can get the specified register directly from the opcode byte.
+// I decided to use an array of 8 registers so that I can get the specified
+// register directly from the opcode byte.
 // So I have to make sure that the register[M_REF] is never used as a register.
 const REGISTER_NUM: usize = 8;
 const REG_B: usize = 0x00; // 0b0000_0000
@@ -77,6 +77,62 @@ impl Intel8080 {
         }
     }
 
+    pub fn print_state(&self) {
+        println!("opcode: {:#04X}", self.memory[self.pc as usize]);
+        println!("        CPU Misc. Field State");
+        println!("-------------------------------------------");
+        println!("FIELD |DEC\t|HEX\t|BIN               |");
+        println!("-------------------------------------------|");
+        println!("PC    |{}\t|{:#06X}\t|{:#018b}|", self.pc, self.pc, self.pc);
+        println!("SP    |{}\t|{:#06X}\t|{:#018b}|", self.sp, self.sp, self.sp);
+        println!("-------------------------------------------|");
+        println!("                                           |");
+        println!("        CPU Register State                 |");
+        println!("-------------------------------------------|");
+        println!("REGISTER |DEC\t|HEX\t|BIN               |");
+        println!("-------------------------------------------|");
+        println!(
+            "A        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_A], self.registers[REG_A], self.registers[REG_A]
+        );
+        println!(
+            "B        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_B], self.registers[REG_B], self.registers[REG_B]
+        );
+        println!(
+            "C        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_C], self.registers[REG_C], self.registers[REG_C]
+        );
+        println!(
+            "D        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_D], self.registers[REG_D], self.registers[REG_D]
+        );
+        println!(
+            "E        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_E], self.registers[REG_E], self.registers[REG_E]
+        );
+        println!(
+            "H        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_H], self.registers[REG_H], self.registers[REG_H]
+        );
+        println!(
+            "L        |{}\t|{:#06X}\t|{:#018b}|",
+            self.registers[REG_L], self.registers[REG_L], self.registers[REG_L]
+        );
+        println!("-------------------------------------------|");
+        println!("                                           |");
+        println!("        CPU FLAG State                     |");
+        println!("-------------------------------------------|");
+        println!("        FLAG         |       VALUE         |");
+        println!("-------------------------------------------|");
+        println!("  CARRY              | {:#04X}\t           |", self.cc.cy);
+        println!("  PARITY             | {:#04X}\t           |", self.cc.p);
+        println!("  AUX-CARRY          | {:#04X}\t           |", self.cc.ac);
+        println!("  ZERO               | {:#04X}\t           |", self.cc.z);
+        println!("  SIGN               | {:#04X}\t           |", self.cc.s);
+        println!("-------------------------------------------\n\n");
+    }
+
     // TODO: This is just for testing purposes
     pub fn get_pc(&mut self) -> u16 {
         self.pc
@@ -113,13 +169,12 @@ impl Intel8080 {
 
     // TODO: use array of function pointers for better visibility
     pub fn execute(&mut self, op: u8) {
-        print!("{:#06X} {:02X} ", self.pc, op);
         match op {
             0x00 => {}
             0x01 => self.op_lxi_b(),
             0x02 => unimplemented!("Error: Unimplemented opcode."),
             0x03 => unimplemented!("Error: Unimplemented opcode."),
-            0x04 => unimplemented!("Error: Unimplemented opcode."),
+            0x04 => self.op_inr(),
             0x05 => self.op_dcr(),
             0x06 => self.op_mvi_b(),
             0x07 => unimplemented!("Error: Unimplemented opcode."),
@@ -164,7 +219,7 @@ impl Intel8080 {
             0x2c => unimplemented!("Error: Unimplemented opcode."),
             0x2d => unimplemented!("Error: Unimplemented opcode."),
             0x2e => unimplemented!("Error: Unimplemented opcode."),
-            0x2f => unimplemented!("Error: Unimplemented opcode."),
+            0x2f => self.op_cma(),
 
             0x30 => unimplemented!("Error: Unimplemented opcode."),
             0x31 => self.op_lxi_sp(),
@@ -173,7 +228,7 @@ impl Intel8080 {
             0x34 => unimplemented!("Error: Unimplemented opcode."),
             0x35 => unimplemented!("Error: Unimplemented opcode."),
             0x36 => self.op_mvi_m(),
-            0x37 => unimplemented!("Error: Unimplemented opcode."),
+            0x37 => self.op_stc(),
             0x38 => unimplemented!("Error: Unimplemented opcode."),
             0x39 => self.op_dad(),
             0x3a => self.op_lda(),
@@ -181,7 +236,7 @@ impl Intel8080 {
             0x3c => unimplemented!("Error: Unimplemented opcode."),
             0x3d => unimplemented!("Error: Unimplemented opcode."),
             0x3e => self.op_mvi_a(),
-            0x3f => unimplemented!("Error: Unimplemented opcode."),
+            0x3f => self.op_cmc(),
 
             0x40 => unimplemented!("Error: Unimplemented opcode."),
             0x41 => unimplemented!("Error: Unimplemented opcode."),
@@ -322,13 +377,13 @@ impl Intel8080 {
             0xc0 => unimplemented!("Error: Unimplemented opcode."),
             0xc1 => self.op_pop(),
             0xc2 => {
-                op_bytes = 3;
+                // op_bytes = 3;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 let byte3 = self.memory[(self.pc as usize) + 2];
                 println!("JNZ ${:02X}{:02X}", byte3, byte2);
             }
             0xc3 => {
-                op_bytes = 3;
+                // op_bytes = 3;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 let byte3 = self.memory[(self.pc as usize) + 2];
                 println!("JMP ${:02X}{:02X}", byte3, byte2);
@@ -338,7 +393,7 @@ impl Intel8080 {
                 println!("PUSH B");
             }
             0xc6 => {
-                op_bytes = 2;
+                // op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("ADI #{:02X}", byte2);
             }
@@ -351,7 +406,7 @@ impl Intel8080 {
             0xcb => unimplemented!("Error: Unimplemented opcode."),
             0xcc => unimplemented!("Error: Unimplemented opcode."),
             0xcd => {
-                op_bytes = 3;
+                // op_bytes = 3;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 let byte3 = self.memory[(self.pc as usize) + 2];
                 println!("CALL ${:02X}{:02X}", byte3, byte2);
@@ -363,7 +418,7 @@ impl Intel8080 {
             0xd1 => self.op_pop(),
             0xd2 => unimplemented!("Error: Unimplemented opcode."),
             0xd3 => {
-                op_bytes = 2;
+                // op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("OUT #{:02X}", byte2);
             }
@@ -391,7 +446,7 @@ impl Intel8080 {
                 println!("PUSH H");
             }
             0xe6 => {
-                op_bytes = 2;
+                // op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("ANI #{:03X}", byte2);
             }
@@ -426,7 +481,7 @@ impl Intel8080 {
             0xfc => unimplemented!("Error: Unimplemented opcode."),
             0xfd => unimplemented!("Error: Unimplemented opcode."),
             0xfe => {
-                op_bytes = 2;
+                // op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
                 println!("CPI #{:03X}", byte2);
             }
@@ -435,6 +490,7 @@ impl Intel8080 {
         self.pc += 1;
     }
 
+    // TODO: Move all the operation implementations to a different file.
     fn op_lxi_b(&mut self) {
         // B <- byte3, C <- byte2
         let byte2 = self.memory[(self.pc as usize) + 1];
@@ -443,8 +499,6 @@ impl Intel8080 {
         self.c = byte2;
         self.pc += 3;
     }
-
-    fn op_mvi(&mut self) {}
 
     fn op_mvi_b(&mut self) {
         // B <- byte2
@@ -657,33 +711,40 @@ impl Intel8080 {
         let op: u8 = self.memory[self.pc as usize];
         let reg_pair: u8 = (op & 0b0011_0000) >> 4;
         let hl: u16 = ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
-        let mut sum: u16 = 0;
-        let mut carry: bool = false;
 
         match reg_pair {
             0b00 => {
                 let bc: u16 =
                     ((self.registers[REG_B] as u16) << 8) | (self.registers[REG_C] as u16);
-                (sum, carry) = hl.overflowing_add(bc);
+                let (sum, carry) = hl.overflowing_add(bc);
+                self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (sum & 0x00FF) as u8;
+                self.cc.cy = if carry { 1 } else { 0 };
             }
             0b01 => {
                 let de: u16 =
                     ((self.registers[REG_D] as u16) << 8) | (self.registers[REG_E] as u16);
-                (sum, carry) = hl.overflowing_add(de);
+                let (sum, carry) = hl.overflowing_add(de);
+                self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (sum & 0x00FF) as u8;
+                self.cc.cy = if carry { 1 } else { 0 };
             }
             0b10 => {
-                (sum, carry) = hl.overflowing_add(hl);
+                let (sum, carry) = hl.overflowing_add(hl);
+                self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (sum & 0x00FF) as u8;
+                self.cc.cy = if carry { 1 } else { 0 };
             }
             0b11 => {
-                (sum, carry) = hl.overflowing_add(self.sp);
+                let (sum, carry) = hl.overflowing_add(self.sp);
+                self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (sum & 0x00FF) as u8;
+                self.cc.cy = if carry { 1 } else { 0 };
             }
             _ => {
                 unreachable!();
             }
         }
-        self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
-        self.registers[REG_L] = (sum & 0x00FF) as u8;
-        self.cc.cy = if carry { 1 } else { 0 };
     }
 
     /// Description: The specified byte is logically ANDed bit by bit
@@ -709,7 +770,7 @@ impl Intel8080 {
     /// Condition bits affected: Carry, Zero, Sign, Parity, Auxiliary Carry
     fn op_xra(&mut self) {
         let op = self.memory[self.pc as usize];
-        let reg = op & 0x0000_0111;
+        let reg = op & 0b0000_0111;
 
         match reg {
             M_REF => {
@@ -725,6 +786,18 @@ impl Intel8080 {
         // TODO: update ac flag in the future? probably not gonna happen
         self.cc.cy = 0;
     }
+
+    /// Description: The contents of the specified register pair
+    /// are saved in two bytes of memory indicated by the stack
+    /// pointer SP. The contents of the first register are saved
+    /// at the memory address on eless than the address indicated
+    /// by the stack pointer; the contents of the second register
+    /// are saved at the address two less than the address indicated
+    /// by the stack pointer. If register PSW is specified, the first
+    /// byte of information saved holds the contents of the A register;
+    /// the second byte holds the settings of the five condition bits,
+    /// Condition bits affected: None
+    //fn op_push(&mut self) {}
 
     /// Description: The contents of the specified register pair are
     /// restored from two bytes of memory indicated by the stack pointer SP.
@@ -760,6 +833,9 @@ impl Intel8080 {
                 self.cc.ac = (psw & 0b0001_0000) >> 4;
                 self.cc.p = (psw & 0b0000_0100) >> 2;
                 self.cc.cy = psw & 0b0000_0001;
+            }
+            _ => {
+                unreachable!("Aborted");
             }
         }
         self.sp += 2;
