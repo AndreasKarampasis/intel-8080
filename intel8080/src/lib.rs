@@ -78,20 +78,11 @@ impl Intel8080 {
     }
 
     pub fn test(&mut self) {
-        self.sp = 9;
-        self.memory[0x0] = 0b1111_0101;
-        self.cc.s = 1;
-        self.cc.z = 0;
-        self.cc.ac = 1;
-        self.cc.p = 0;
-        self.cc.cy = 1;
         self.print_state();
-        self.op_push();
-        println!(
-            "s z 0 a 0 p 1 c\n{} {} 0 {} 0 {} 1 {}",
-            self.cc.s, self.cc.z, self.cc.ac, self.cc.p, self.cc.ac
-        );
-        println!("{:#b}", self.memory[self.sp as usize]);
+        self.memory[0] = 0xc3;
+        self.memory[1] = 0b0011_1100;
+        self.memory[2] = 0b1100_0000;
+        self.op_jmp();
         self.print_state();
     }
 
@@ -890,5 +881,15 @@ impl Intel8080 {
             }
         }
         self.sp += 2;
+    }
+
+    /// Description: Program execution continues unconditionally
+    /// at memory address adr.
+    /// Condition bits affected: None
+    fn op_jmp(&mut self) {
+        let low_addr: u16 = self.memory[(self.pc + 1) as usize] as u16;
+        let high_addr: u16 = self.memory[(self.pc + 2) as usize] as u16;
+        let addr: u16 = (high_addr << 8) | low_addr;
+        self.pc = addr;
     }
 }
