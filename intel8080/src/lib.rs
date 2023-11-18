@@ -79,10 +79,9 @@ impl Intel8080 {
 
     pub fn test(&mut self) {
         self.print_state();
-        self.memory[0] = 0xc6;
-        self.registers[REG_A] = 1;
-        self.memory[1] = 0xFF;
-        self.op_adi();
+        self.memory[0] = 0b00000110;
+        self.memory[1] = 0b1111_0011;
+        self.op_mvi();
         self.print_state();
     }
 
@@ -180,33 +179,33 @@ impl Intel8080 {
     pub fn execute(&mut self, op: u8) {
         match op {
             0x00 => {}
-            0x01 => self.op_lxi_b(),
+            0x01 => self.op_lxi(),
             0x02 => unimplemented!("Error: Unimplemented opcode."),
             0x03 => unimplemented!("Error: Unimplemented opcode."),
             0x04 => self.op_inr(),
             0x05 => self.op_dcr(),
-            0x06 => self.op_mvi_b(),
+            0x06 => self.op_mvi(),
             0x07 => self.op_rlc(),
             0x08 => unimplemented!("Error: Unimplemented opcode."),
             0x09 => self.op_dad(),
-            0x0a => unimplemented!("Error: Unimplemented opcode."),
+            0x0a => self.op_ldax(),
             0x0b => unimplemented!("Error: Unimplemented opcode."),
             0x0c => unimplemented!("Error: Unimplemented opcode."),
             0x0d => self.op_dcr(),
-            0x0e => self.op_mvi_c(),
+            0x0e => self.op_mvi(),
             0x0f => self.op_rrc(),
 
             0x10 => unimplemented!("Error: Unimplemented opcode."),
-            0x11 => self.op_lxi_d(),
+            0x11 => self.op_lxi(),
             0x12 => unimplemented!("Error: Unimplemented opcode."),
-            0x13 => self.op_inx_d(),
+            0x13 => self.op_inx(),
             0x14 => unimplemented!("Error: Unimplemented opcode."),
             0x15 => unimplemented!("Error: Unimplemented opcode."),
             0x16 => unimplemented!("Error: Unimplemented opcode."),
             0x17 => unimplemented!("Error: Unimplemented opcode."),
             0x18 => unimplemented!("Error: Unimplemented opcode."),
             0x19 => self.op_dad(),
-            0x1a => self.op_ldax_d(),
+            0x1a => self.op_ldax(),
             0x1b => unimplemented!("Error: Unimplemented opcode."),
             0x1c => unimplemented!("Error: Unimplemented opcode."),
             0x1d => unimplemented!("Error: Unimplemented opcode."),
@@ -214,12 +213,12 @@ impl Intel8080 {
             0x1f => unimplemented!("Error: Unimplemented opcode."),
 
             0x20 => unimplemented!("Error: Unimplemented opcode."),
-            0x21 => self.op_lxi_h(),
+            0x21 => self.op_lxi(),
             0x22 => unimplemented!("Error: Unimplemented opcode."),
-            0x23 => self.op_inx_h(),
+            0x23 => self.op_inx(),
             0x24 => unimplemented!("Error: Unimplemented opcode."),
             0x25 => unimplemented!("Error: Unimplemented opcode."),
-            0x26 => self.op_mvi_h(),
+            0x26 => self.op_mvi(),
             0x27 => unimplemented!("Error: Unimplemented opcode."),
             0x28 => unimplemented!("Error: Unimplemented opcode."),
             0x29 => self.op_dad(),
@@ -231,12 +230,12 @@ impl Intel8080 {
             0x2f => self.op_cma(),
 
             0x30 => unimplemented!("Error: Unimplemented opcode."),
-            0x31 => self.op_lxi_sp(),
+            0x31 => self.op_lxi(),
             0x32 => self.op_sta(),
             0x33 => unimplemented!("Error: Unimplemented opcode."),
             0x34 => unimplemented!("Error: Unimplemented opcode."),
             0x35 => unimplemented!("Error: Unimplemented opcode."),
-            0x36 => self.op_mvi_m(),
+            0x36 => self.op_mvi(),
             0x37 => self.op_stc(),
             0x38 => unimplemented!("Error: Unimplemented opcode."),
             0x39 => self.op_dad(),
@@ -244,7 +243,7 @@ impl Intel8080 {
             0x3b => unimplemented!("Error: Unimplemented opcode."),
             0x3c => unimplemented!("Error: Unimplemented opcode."),
             0x3d => unimplemented!("Error: Unimplemented opcode."),
-            0x3e => self.op_mvi_a(),
+            0x3e => self.op_mvi(),
             0x3f => self.op_cmc(),
 
             0x40 => unimplemented!("Error: Unimplemented opcode."),
@@ -428,9 +427,7 @@ impl Intel8080 {
             0xe8 => unimplemented!("Error: Unimplemented opcode."),
             0xe9 => unimplemented!("Error: Unimplemented opcode."),
             0xea => unimplemented!("Error: Unimplemented opcode."),
-            0xeb => {
-                println!("XCHG");
-            }
+            0xeb => self.op_xchg(),
             0xec => unimplemented!("Error: Unimplemented opcode."),
             0xed => unimplemented!("Error: Unimplemented opcode."),
             0xee => unimplemented!("Error: Unimplemented opcode."),
@@ -458,96 +455,95 @@ impl Intel8080 {
 
     // TODO: Move all the operation implementations to a different file.
 
-    fn op_mvi_b(&mut self) {
-        // B <- byte2
-        let byte2 = self.memory[(self.pc as usize) + 1];
-        self.b = byte2;
+    /// Description: The byte of immediate data is stored in
+    /// tge specified register of memory byte
+    /// Condition bits affected: None.
+    fn op_mvi(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg = op & 0b0011_1000;
+        let imm_data = self.memory[(self.pc + 1) as usize];
+        match reg {
+            M_REF => {
+                let offset: u16 =
+                    ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+                self.registers[offset as usize] = imm_data;
+            }
+            _ => {
+                self.registers[reg as usize] = imm_data;
+            }
+        }
         self.pc += 2;
     }
 
-    fn op_mvi_c(&mut self) {
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        self.c = byte2;
-        self.pc += 2;
+    /// Description: The 16-bit number held in the specified
+    /// register pair is incremented by one.
+    /// Condition bits affected: None.
+    fn op_inx(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg_pair = op & 0b0011_0000;
+        match reg_pair {
+            0b00 => {
+                let number = ((self.registers[REG_B] as u16) << 8) | (self.registers[REG_C] as u16);
+                let sum = number + 1;
+                self.registers[REG_B] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_C] = (sum & 0x00FF) as u8;
+            }
+            0b01 => {
+                let number = ((self.registers[REG_D] as u16) << 8) | (self.registers[REG_E] as u16);
+                let sum = number + 1;
+                self.registers[REG_D] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_E] = (sum & 0x00FF) as u8;
+            }
+            0b10 => {
+                let number = ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+                let sum = number + 1;
+                self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (sum & 0x00FF) as u8;
+            }
+            0b11 => {
+                self.sp += 1;
+            }
+            _ => {
+                unreachable!("")
+            }
+        }
     }
 
-    fn op_mvi_h(&mut self) {
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        self.h = byte2;
-        self.pc += 2;
-    }
-
-    /// The byte of immediate data is stored in the specified memory byte
+    /// Description: The third byte of the instruction is loaded
+    /// into the first register of the specified pair, while the
+    /// second byte of the instruction is loaded into the second
+    /// register of the specified pair. If SP is specified as the
+    /// register pair, the second byte of the instruction
+    /// replaces the leas significant 8 bits of the stack pointer,
+    /// while the third byte of the instruction replaces the most
+    /// significant 8 bits of the stack pointer
     /// Condition bits affected: None
-    fn op_mvi_m(&mut self) {
-        let byte2: u8 = self.memory[(self.pc + 1) as usize];
-        let offset: u16 = ((self.h as u16) << 8) | (self.l as u16);
-        self.memory[offset as usize] = byte2;
+    fn op_lxi(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg_pair = op & 0b0011_0000;
+        let low_data = self.memory[(self.pc as usize) + 1];
+        let high_data = self.memory[(self.pc as usize) + 2];
+        match reg_pair {
+            0b00 => {
+                self.registers[REG_B] = high_data;
+                self.registers[REG_C] = low_data;
+            }
+            0b01 => {
+                self.registers[REG_D] = high_data;
+                self.registers[REG_E] = low_data;
+            }
+            0b10 => {
+                self.registers[REG_H] = high_data;
+                self.registers[REG_L] = low_data;
+            }
+            0b11 => {
+                self.sp = ((high_data as u16) << 8) | (low_data as u16);
+            }
+            _ => {
+                unreachable!("Sould not be able to reach here.");
+            }
+        }
         self.pc += 2;
-    }
-
-    /// The byte of immediate data is stored in the accumulator
-    /// Condition bits affected: None
-    fn op_mvi_a(&mut self) {
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        self.a = byte2;
-        self.pc += 2;
-    }
-    fn op_lxi_b(&mut self) {
-        // B <- byte3, C <- byte2
-        let byte2 = self.memory[(self.pc as usize) + 1];
-        let byte3 = self.memory[(self.pc as usize) + 2];
-        self.b = byte3;
-        self.c = byte2;
-        self.pc += 3;
-    }
-    /// This instruction loads the register pair DE with a 16-bit
-    /// address formed by the immediate 8-bit values in the next
-    /// two memory locations.
-    fn op_lxi_d(&mut self) {
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        let byte3 = self.memory[(self.pc + 2) as usize];
-        self.d = byte3;
-        self.e = byte2;
-        self.pc += 3;
-    }
-
-    fn op_inx_d(&mut self) {
-        let de_reg_pair = ((self.d as u16) << 8) | (self.e as u16);
-        let sum = de_reg_pair + 1;
-        self.d = ((sum & 0xFF00) >> 8) as u8;
-        self.e = (sum & 0x00FF) as u8;
-    }
-
-    /// Load accumulator with the contents of the memory location DE
-    fn op_ldax_d(&mut self) {
-        let de = ((self.d as u16) << 8) | (self.e as u16);
-        // What happens if offset is out of memory bounds?
-        self.a = self.memory[de as usize];
-    }
-
-    fn op_lxi_h(&mut self) {
-        // H <- byte 3, L <- byte 2
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        let byte3 = self.memory[(self.pc + 2) as usize];
-        self.h = byte3;
-        self.l = byte2;
-        self.pc += 3;
-    }
-
-    /// Increments the HL register pair.
-    fn op_inx_h(&mut self) {
-        let hl_reg_pair = ((self.h as u16) << 8) | (self.l as u16);
-        let sum = hl_reg_pair + 1;
-        self.h = ((sum & 0xFF00) >> 8) as u8;
-        self.l = (sum & 0x00FF) as u8;
-    }
-
-    fn op_lxi_sp(&mut self) {
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        let byte3 = self.memory[(self.pc + 2) as usize];
-        self.sp = ((byte3 as u16) << 8) | (byte2 as u16);
-        self.pc += 3;
     }
 
     /// Description: Rotate Accumulator Left: The carry bit is set equal
@@ -593,6 +589,24 @@ impl Intel8080 {
         self.a = self.memory[offset as usize];
 
         self.pc += 3;
+    }
+    /// Description: The contents of the memory location
+    /// addressed by registers B and C, or by registers D and E,
+    /// replace the contents of the accumulator.
+    /// Condition bits affected: None
+    fn op_ldax(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg_pair = op & 0b0001_0000;
+        match reg_pair {
+            0b0 => {}
+            0b1 => {
+                let offset = ((self.registers[REG_D] as u16) << 8) | (self.registers[REG_E] as u16);
+                self.registers[REG_A] = self.memory[offset as usize];
+            }
+            _ => {
+                unreachable!("");
+            }
+        }
     }
 
     /// Description: One byte of data is moved from the register specified by src to
@@ -958,5 +972,18 @@ impl Intel8080 {
     /// Condition bits afftected: None
     fn op_di(&mut self) {
         self.interrupts_enable = true;
+    }
+
+    /// Description: The 16 bits of data held in the H and L
+    /// registers are exchanged with 16 bits of data held in
+    /// the D and E registers.
+    /// Condition bits affected: None
+    fn op_xchg(&mut self) {
+        let tmp1 = self.registers[REG_D];
+        let tmp2 = self.registers[REG_E];
+        self.registers[REG_D] = self.registers[REG_H];
+        self.registers[REG_E] = self.registers[REG_L];
+        self.registers[REG_H] = tmp1;
+        self.registers[REG_L] = tmp2;
     }
 }
