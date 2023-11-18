@@ -32,7 +32,7 @@ pub struct Intel8080 {
     pc: u16,
     sp: u16,
     cc: ConditionCodes,
-    // int_enable: bool,
+    interrupts_enable: bool,
 }
 
 impl ConditionCodes {
@@ -73,7 +73,7 @@ impl Intel8080 {
             pc: 0,
             sp: 0,
             cc: ConditionCodes::new(),
-            //            int_enable: false,
+            interrupts_enable: false,
         }
     }
 
@@ -403,11 +403,7 @@ impl Intel8080 {
             0xd0 => unimplemented!("Error: Unimplemented opcode."),
             0xd1 => self.op_pop(),
             0xd2 => unimplemented!("Error: Unimplemented opcode."),
-            0xd3 => {
-                // op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("OUT #{:02X}", byte2);
-            }
+            0xd3 => self.op_out(),
             0xd4 => unimplemented!("Error: Unimplemented opcode."),
             0xd5 => self.op_push(),
             0xd6 => unimplemented!("Error: Unimplemented opcode."),
@@ -427,11 +423,7 @@ impl Intel8080 {
             0xe3 => unimplemented!("Error: Unimplemented opcode."),
             0xe4 => unimplemented!("Error: Unimplemented opcode."),
             0xe5 => self.op_push(),
-            0xe6 => {
-                // op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("ANI #{:03X}", byte2);
-            }
+            0xe6 => self.op_ani(),
             0xe7 => unimplemented!("Error: Unimplemented opcode."),
             0xe8 => unimplemented!("Error: Unimplemented opcode."),
             0xe9 => unimplemented!("Error: Unimplemented opcode."),
@@ -447,7 +439,7 @@ impl Intel8080 {
             0xf0 => unimplemented!("Error: Unimplemented opcode."),
             0xf1 => self.op_pop(),
             0xf2 => unimplemented!("Error: Unimplemented opcode."),
-            0xf3 => unimplemented!("Error: Unimplemented opcode."),
+            0xf3 => self.op_di(),
             0xf4 => unimplemented!("Error: Unimplemented opcode."),
             0xf5 => self.op_push(),
             0xf6 => unimplemented!("Error: Unimplemented opcode."),
@@ -455,30 +447,16 @@ impl Intel8080 {
             0xf8 => unimplemented!("Error: Unimplemented opcode."),
             0xf9 => unimplemented!("Error: Unimplemented opcode."),
             0xfa => unimplemented!("Error: Unimplemented opcode."),
-            0xfb => {
-                println!("EI");
-            }
+            0xfb => self.op_ei(),
             0xfc => unimplemented!("Error: Unimplemented opcode."),
             0xfd => unimplemented!("Error: Unimplemented opcode."),
-            0xfe => {
-                // op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("CPI #{:03X}", byte2);
-            }
+            0xfe => self.op_cpi(),
             0xff => unimplemented!("Error: Unimplemented opcode."),
         }
         self.pc += 1;
     }
 
     // TODO: Move all the operation implementations to a different file.
-    fn op_lxi_b(&mut self) {
-        // B <- byte3, C <- byte2
-        let byte2 = self.memory[(self.pc as usize) + 1];
-        let byte3 = self.memory[(self.pc as usize) + 2];
-        self.b = byte3;
-        self.c = byte2;
-        self.pc += 3;
-    }
 
     fn op_mvi_b(&mut self) {
         // B <- byte2
@@ -515,7 +493,14 @@ impl Intel8080 {
         self.a = byte2;
         self.pc += 2;
     }
-
+    fn op_lxi_b(&mut self) {
+        // B <- byte3, C <- byte2
+        let byte2 = self.memory[(self.pc as usize) + 1];
+        let byte3 = self.memory[(self.pc as usize) + 2];
+        self.b = byte3;
+        self.c = byte2;
+        self.pc += 3;
+    }
     /// This instruction loads the register pair DE with a 16-bit
     /// address formed by the immediate 8-bit values in the next
     /// two memory locations.
@@ -897,6 +882,30 @@ impl Intel8080 {
         self.update_flags(self.registers[REG_A]);
         self.pc += 1;
     }
+    /// Description: The byte of immediate data is logically
+    /// to ANDed with the contents of the accumulator. The Carry bit
+    /// is reset to zero.
+    /// Condition bits affected: Carry, Sign, Zero, Parity,
+    /// Auxiliary Carry
+    fn op_ani(&mut self) {
+        let imm_data = self.memory[(self.pc + 1) as usize];
+        self.registers[REG_A] = self.registers[REG_A] & imm_data;
+        self.cc.cy = 0;
+        self.update_flags(self.registers[REG_A]);
+        self.pc += 1;
+    }
+
+    /// Description: The byte of immediate data is compared
+    /// to the contents of the accumulator.
+    /// Condition bits affected: Carry, Zero, Sign, Parity,
+    /// Auxiliary Carry
+    fn op_cpi(&mut self) {
+        let imm_data = self.memory[(self.pc + 1) as usize];
+        let (res, carry) = self.registers[REG_A].overflowing_sub(imm_data);
+        self.update_flags(res);
+        self.cc.cy = if carry { 1 } else { 0 };
+        self.pc += 1;
+    }
 
     /// Description: A call operation is unconditionally
     /// performed to subroutine sub.
@@ -921,5 +930,33 @@ impl Intel8080 {
         let ret_hi_add = self.memory[(self.sp) as usize] as u16;
         let ret_add = (ret_hi_add << 8) | ret_lo_add;
         self.pc = ret_add;
+    }
+
+    /// Description: The contents of the accumulator are sent
+    /// to output device number exp.
+    /// Condition bits affected: None
+    fn op_out(&mut self) {
+        let exp = self.memory[(self.pc + 1) as usize];
+        // TODO:
+        // IN and OUT are instructions that the 8080 hardware
+        // used to talk to external hardware. For now, implement
+        // these but make them do nothing besides skip over its
+        //data byte.
+        // output[exp] = self.registers[REG_A];
+        self.pc += 1;
+    }
+
+    /// Description: This instruction sets the INTE flip-flop
+    /// enabling the CPU to recognise and respond to interrupts.
+    /// Condition bits afftected: None
+    fn op_ei(&mut self) {
+        self.interrupts_enable = true;
+    }
+
+    /// Description: This instruction resets the INTE flip-flop
+    /// causing the CPU to ignore all interrupts.
+    /// Condition bits afftected: None
+    fn op_di(&mut self) {
+        self.interrupts_enable = true;
     }
 }
