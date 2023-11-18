@@ -78,9 +78,20 @@ impl Intel8080 {
     }
 
     pub fn test(&mut self) {
-        self.registers[REG_A] = 0b1111_0010;
+        self.sp = 9;
+        self.memory[0x0] = 0b1111_0101;
+        self.cc.s = 1;
+        self.cc.z = 0;
+        self.cc.ac = 1;
+        self.cc.p = 0;
+        self.cc.cy = 1;
         self.print_state();
-        self.op_rlc();
+        self.op_push();
+        println!(
+            "s z 0 a 0 p 1 c\n{} {} 0 {} 0 {} 1 {}",
+            self.cc.s, self.cc.z, self.cc.ac, self.cc.p, self.cc.ac
+        );
+        println!("{:#b}", self.memory[self.sp as usize]);
         self.print_state();
     }
 
@@ -396,9 +407,7 @@ impl Intel8080 {
                 println!("JMP ${:02X}{:02X}", byte3, byte2);
             }
             0xc4 => unimplemented!("Error: Unimplemented opcode."),
-            0xc5 => {
-                println!("PUSH B");
-            }
+            0xc5 => self.op_push(),
             0xc6 => {
                 // op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
@@ -430,9 +439,7 @@ impl Intel8080 {
                 println!("OUT #{:02X}", byte2);
             }
             0xd4 => unimplemented!("Error: Unimplemented opcode."),
-            0xd5 => {
-                println!("PUSH D");
-            }
+            0xd5 => self.op_push(),
             0xd6 => unimplemented!("Error: Unimplemented opcode."),
             0xd7 => unimplemented!("Error: Unimplemented opcode."),
             0xd8 => unimplemented!("Error: Unimplemented opcode."),
@@ -449,9 +456,7 @@ impl Intel8080 {
             0xe2 => unimplemented!("Error: Unimplemented opcode."),
             0xe3 => unimplemented!("Error: Unimplemented opcode."),
             0xe4 => unimplemented!("Error: Unimplemented opcode."),
-            0xe5 => {
-                println!("PUSH H");
-            }
+            0xe5 => self.op_push(),
             0xe6 => {
                 // op_bytes = 2;
                 let byte2 = self.memory[(self.pc as usize) + 1];
@@ -474,9 +479,7 @@ impl Intel8080 {
             0xf2 => unimplemented!("Error: Unimplemented opcode."),
             0xf3 => unimplemented!("Error: Unimplemented opcode."),
             0xf4 => unimplemented!("Error: Unimplemented opcode."),
-            0xf5 => {
-                println!("PUSH PSW");
-            }
+            0xf5 => self.op_push(),
             0xf6 => unimplemented!("Error: Unimplemented opcode."),
             0xf7 => unimplemented!("Error: Unimplemented opcode."),
             0xf8 => unimplemented!("Error: Unimplemented opcode."),
@@ -806,14 +809,46 @@ impl Intel8080 {
     /// Description: The contents of the specified register pair
     /// are saved in two bytes of memory indicated by the stack
     /// pointer SP. The contents of the first register are saved
-    /// at the memory address on eless than the address indicated
+    /// at the memory address one less than the address indicated
     /// by the stack pointer; the contents of the second register
     /// are saved at the address two less than the address indicated
     /// by the stack pointer. If register PSW is specified, the first
     /// byte of information saved holds the contents of the A register;
     /// the second byte holds the settings of the five condition bits,
     /// Condition bits affected: None
-    //fn op_push(&mut self) {}
+    fn op_push(&mut self) {
+        let op = self.memory[self.pc as usize];
+        let reg_pair = (op & 0b00110000) >> 4;
+        match reg_pair {
+            0b00 => {
+                self.memory[(self.sp + 1) as usize] = self.registers[REG_B];
+                self.memory[self.sp as usize] = self.registers[REG_C];
+            }
+            0b01 => {
+                self.memory[(self.sp + 1) as usize] = self.registers[REG_D];
+                self.memory[self.sp as usize] = self.registers[REG_E];
+            }
+            0b10 => {
+                self.memory[(self.sp + 1) as usize] = self.registers[REG_H];
+                self.memory[self.sp as usize] = self.registers[REG_L];
+            }
+            0b11 => {
+                self.memory[(self.sp + 1) as usize] = self.registers[REG_A];
+                let mut flags: u8 = 0b0000_0000;
+                flags = flags | (self.cc.s << 7);
+                flags = flags | (self.cc.z << 6);
+                flags = flags | (self.cc.ac << 4);
+                flags = flags | (self.cc.p << 2);
+                flags = flags | 0b0000_0010;
+                flags = flags | self.cc.cy;
+                self.memory[self.sp as usize] = flags;
+            }
+            _ => {
+                unreachable!("Aborted");
+            }
+        }
+        self.sp -= 2;
+    }
 
     /// Description: The contents of the specified register pair are
     /// restored from two bytes of memory indicated by the stack pointer SP.
