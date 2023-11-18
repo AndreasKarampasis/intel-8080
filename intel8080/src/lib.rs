@@ -486,6 +486,7 @@ impl Intel8080 {
                 unreachable!("")
             }
         }
+        self.pc += 1;
     }
 
     /// Description: The third byte of the instruction is loaded
@@ -873,8 +874,9 @@ impl Intel8080 {
         let addr: u16 = (high_addr << 8) | low_addr;
         if self.cc.z == 0 {
             self.pc = addr;
+        } else {
+            self.pc += 3;
         }
-        self.pc += 1;
     }
 
     /// Description: The byte of immediate data is added to

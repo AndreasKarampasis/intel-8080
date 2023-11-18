@@ -12,8 +12,9 @@ fn main() {
     cpu.load(&buffer);
 
     while cpu.get_pc() < (buffer.len() as u16) {
+        print!("{}[2J", 27 as char);
+        cpu.print_state();
         cpu.tick();
-        // cpu.print_state();
-        println!("pc = {:#06x}", cpu.get_pc())
     }
+    println!("Done");
 }
