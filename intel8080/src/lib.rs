@@ -392,18 +392,11 @@ impl Intel8080 {
             0xc6 => self.op_adi(),
             0xc7 => unimplemented!("Error: Unimplemented opcode."),
             0xc8 => unimplemented!("Error: Unimplemented opcode."),
-            0xc9 => {
-                println!("RET");
-            }
+            0xc9 => self.op_ret(),
             0xca => unimplemented!("Error: Unimplemented opcode."),
             0xcb => unimplemented!("Error: Unimplemented opcode."),
             0xcc => unimplemented!("Error: Unimplemented opcode."),
-            0xcd => {
-                // op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("CALL ${:02X}{:02X}", byte3, byte2);
-            }
+            0xcd => self.op_call(),
             0xce => unimplemented!("Error: Unimplemented opcode."),
             0xcf => unimplemented!("Error: Unimplemented opcode."),
 
@@ -903,5 +896,30 @@ impl Intel8080 {
         self.cc.cy = if carry { 1 } else { 0 };
         self.update_flags(self.registers[REG_A]);
         self.pc += 1;
+    }
+
+    /// Description: A call operation is unconditionally
+    /// performed to subroutine sub.
+    /// Condition bits affected: None
+    fn op_call(&mut self) {
+        let ret: u16 = self.pc + 2;
+        self.memory[(self.sp - 1) as usize] = ((ret & 0xff00) >> 8) as u8;
+        self.memory[(self.sp - 2) as usize] = (ret & 0x00ff) as u8;
+
+        let low_addr: u16 = self.memory[(self.pc + 1) as usize] as u16;
+        let hi_addr: u16 = self.memory[(self.pc + 2) as usize] as u16;
+        self.sp -= 2;
+        self.pc = (hi_addr << 8) | low_addr;
+    }
+
+    /// Description: A return operation is unconditionally
+    /// performed. Thus, execution proceeds with the instruction
+    /// immediately following the last call instruction.
+    /// Condition bits affected: None
+    fn op_ret(&mut self) {
+        let ret_lo_add = self.memory[(self.sp + 1) as usize] as u16;
+        let ret_hi_add = self.memory[(self.sp) as usize] as u16;
+        let ret_add = (ret_hi_add << 8) | ret_lo_add;
+        self.pc = ret_add;
     }
 }
