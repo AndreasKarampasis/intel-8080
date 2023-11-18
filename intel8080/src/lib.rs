@@ -82,7 +82,7 @@ impl Intel8080 {
         self.memory[0] = 0xc3;
         self.memory[1] = 0b0011_1100;
         self.memory[2] = 0b1100_0000;
-        self.op_jmp();
+        self.op_jnz();
         self.print_state();
     }
 
@@ -391,12 +391,7 @@ impl Intel8080 {
                 let byte3 = self.memory[(self.pc as usize) + 2];
                 println!("JNZ ${:02X}{:02X}", byte3, byte2);
             }
-            0xc3 => {
-                // op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JMP ${:02X}{:02X}", byte3, byte2);
-            }
+            0xc3 => self.op_jmp(),
             0xc4 => unimplemented!("Error: Unimplemented opcode."),
             0xc5 => self.op_push(),
             0xc6 => {
@@ -891,5 +886,17 @@ impl Intel8080 {
         let high_addr: u16 = self.memory[(self.pc + 2) as usize] as u16;
         let addr: u16 = (high_addr << 8) | low_addr;
         self.pc = addr;
+    }
+
+    /// Description:If the Zero bit is zero, program execution
+    /// continues at the memory addr.
+    /// Condition bits affected: None
+    fn op_jnz(&mut self) {
+        let low_addr: u16 = self.memory[(self.pc + 1) as usize] as u16;
+        let high_addr: u16 = self.memory[(self.pc + 2) as usize] as u16;
+        let addr: u16 = (high_addr << 8) | low_addr;
+        if self.cc.z == 0 {
+            self.pc = addr;
+        }
     }
 }
