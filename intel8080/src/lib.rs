@@ -79,10 +79,10 @@ impl Intel8080 {
 
     pub fn test(&mut self) {
         self.print_state();
-        self.memory[0] = 0xc3;
-        self.memory[1] = 0b0011_1100;
-        self.memory[2] = 0b1100_0000;
-        self.op_jnz();
+        self.memory[0] = 0xc6;
+        self.registers[REG_A] = 1;
+        self.memory[1] = 0xFF;
+        self.op_adi();
         self.print_state();
     }
 
@@ -109,23 +109,23 @@ impl Intel8080 {
             self.registers[REG_B], self.registers[REG_B], self.registers[REG_B]
         );
         println!(
-            "C        |{}\t|{:#06X}\t|{:#09b}         |",
+            "C        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_C], self.registers[REG_C], self.registers[REG_C]
         );
         println!(
-            "D        |{}\t|{:#06X}\t|{:#09b}         |",
+            "D        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_D], self.registers[REG_D], self.registers[REG_D]
         );
         println!(
-            "E        |{}\t|{:#06X}\t|{:#09b}         |",
+            "E        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_E], self.registers[REG_E], self.registers[REG_E]
         );
         println!(
-            "H        |{}\t|{:#06X}\t|{:#09b}         |",
+            "H        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_H], self.registers[REG_H], self.registers[REG_H]
         );
         println!(
-            "L        |{}\t|{:#06X}\t|{:#09b}         |",
+            "L        |{}\t|{:#06X}\t|{:#010b}        |",
             self.registers[REG_L], self.registers[REG_L], self.registers[REG_L]
         );
         println!("-------------------------------------------|");
@@ -385,20 +385,11 @@ impl Intel8080 {
 
             0xc0 => unimplemented!("Error: Unimplemented opcode."),
             0xc1 => self.op_pop(),
-            0xc2 => {
-                // op_bytes = 3;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                let byte3 = self.memory[(self.pc as usize) + 2];
-                println!("JNZ ${:02X}{:02X}", byte3, byte2);
-            }
+            0xc2 => self.op_jnz(),
             0xc3 => self.op_jmp(),
             0xc4 => unimplemented!("Error: Unimplemented opcode."),
             0xc5 => self.op_push(),
-            0xc6 => {
-                // op_bytes = 2;
-                let byte2 = self.memory[(self.pc as usize) + 1];
-                println!("ADI #{:02X}", byte2);
-            }
+            0xc6 => self.op_adi(),
             0xc7 => unimplemented!("Error: Unimplemented opcode."),
             0xc8 => unimplemented!("Error: Unimplemented opcode."),
             0xc9 => {
@@ -898,5 +889,19 @@ impl Intel8080 {
         if self.cc.z == 0 {
             self.pc = addr;
         }
+    }
+
+    /// Description: The byte of immediate data is added to
+    /// the contents of the accumulator using two's complement
+    /// arithmetic.
+    /// Condition bits affected: Carry, Sign, Zero, Parity,
+    /// Auxiliary Carry
+    fn op_adi(&mut self) {
+        let imm_data = self.memory[(self.pc + 1) as usize];
+        let (sum, carry) = self.registers[REG_A].overflowing_add(imm_data);
+        self.registers[REG_A] = sum;
+        self.cc.cy = if carry { 1 } else { 0 };
+        self.update_flags(self.registers[REG_A]);
+        self.pc += 1;
     }
 }
