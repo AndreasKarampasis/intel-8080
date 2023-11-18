@@ -20,13 +20,6 @@ struct ConditionCodes {
     ac: u8, // Auxiliary carry flag, (space invaders doesn't use it)
 }
 pub struct Intel8080 {
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    h: u8,
-    l: u8,
-    a: u8,
     registers: [u8; REGISTER_NUM],
     memory: [u8; MEMORY_SIZE],
     pc: u16,
@@ -61,13 +54,6 @@ fn is_parity_even(byte: u8) -> bool {
 impl Intel8080 {
     pub fn new() -> Self {
         Self {
-            b: 0,
-            c: 0,
-            d: 0,
-            e: 0,
-            h: 0,
-            l: 0,
-            a: 0,
             registers: [0; REGISTER_NUM],
             memory: [0; MEMORY_SIZE],
             pc: 0,
@@ -75,14 +61,6 @@ impl Intel8080 {
             cc: ConditionCodes::new(),
             interrupts_enable: false,
         }
-    }
-
-    pub fn test(&mut self) {
-        self.print_state();
-        self.memory[0] = 0b00000110;
-        self.memory[1] = 0b1111_0011;
-        self.op_mvi();
-        self.print_state();
     }
 
     pub fn print_state(&self) {
@@ -178,7 +156,9 @@ impl Intel8080 {
     // TODO: use array of function pointers for better visibility
     pub fn execute(&mut self, op: u8) {
         match op {
-            0x00 => {}
+            0x00 => {
+                self.pc += 1;
+            }
             0x01 => self.op_lxi(),
             0x02 => unimplemented!("Error: Unimplemented opcode."),
             0x03 => unimplemented!("Error: Unimplemented opcode."),
@@ -450,7 +430,6 @@ impl Intel8080 {
             0xfe => self.op_cpi(),
             0xff => unimplemented!("Error: Unimplemented opcode."),
         }
-        self.pc += 1;
     }
 
     // TODO: Move all the operation implementations to a different file.
@@ -480,23 +459,23 @@ impl Intel8080 {
     /// Condition bits affected: None.
     fn op_inx(&mut self) {
         let op = self.memory[self.pc as usize];
-        let reg_pair = op & 0b0011_0000;
+        let reg_pair = (op & 0b0011_0000) >> 4;
         match reg_pair {
             0b00 => {
                 let number = ((self.registers[REG_B] as u16) << 8) | (self.registers[REG_C] as u16);
-                let sum = number + 1;
+                let sum = number.wrapping_add(1);
                 self.registers[REG_B] = ((sum & 0xFF00) >> 8) as u8;
                 self.registers[REG_C] = (sum & 0x00FF) as u8;
             }
             0b01 => {
                 let number = ((self.registers[REG_D] as u16) << 8) | (self.registers[REG_E] as u16);
-                let sum = number + 1;
+                let sum = number.wrapping_add(1);
                 self.registers[REG_D] = ((sum & 0xFF00) >> 8) as u8;
                 self.registers[REG_E] = (sum & 0x00FF) as u8;
             }
             0b10 => {
                 let number = ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
-                let sum = number + 1;
+                let sum = number.wrapping_add(1);
                 self.registers[REG_H] = ((sum & 0xFF00) >> 8) as u8;
                 self.registers[REG_L] = (sum & 0x00FF) as u8;
             }
@@ -520,7 +499,7 @@ impl Intel8080 {
     /// Condition bits affected: None
     fn op_lxi(&mut self) {
         let op = self.memory[self.pc as usize];
-        let reg_pair = op & 0b0011_0000;
+        let reg_pair = (op & 0b0011_0000) >> 4;
         let low_data = self.memory[(self.pc as usize) + 1];
         let high_data = self.memory[(self.pc as usize) + 2];
         match reg_pair {
@@ -543,7 +522,7 @@ impl Intel8080 {
                 unreachable!("Sould not be able to reach here.");
             }
         }
-        self.pc += 2;
+        self.pc += 3;
     }
 
     /// Description: Rotate Accumulator Left: The carry bit is set equal
@@ -553,6 +532,7 @@ impl Intel8080 {
     fn op_rlc(&mut self) {
         self.cc.cy = (self.registers[REG_A] & 0b1000_0000) >> 7;
         self.registers[REG_A] = (self.registers[REG_A] << 1) | self.cc.cy;
+        self.pc += 1;
     }
 
     /// Description: Rotate Accumulator Right: The carry bit is set equal to the LS
@@ -562,6 +542,7 @@ impl Intel8080 {
     fn op_rrc(&mut self) {
         self.cc.cy = self.registers[REG_A] & 0b0000_0001;
         self.registers[REG_A] = (self.registers[REG_A] >> 1) | (self.cc.cy << 7);
+        self.pc += 1;
     }
 
     /// Description: The contents of the accumulaltor replace
@@ -573,7 +554,7 @@ impl Intel8080 {
         let hi = self.memory[(self.pc + 2) as usize];
 
         let offset = ((hi as u16) << 8) | (lo as u16);
-        self.memory[offset as usize] = self.a;
+        self.memory[offset as usize] = self.registers[REG_A];
         self.pc += 3;
     }
 
@@ -586,7 +567,7 @@ impl Intel8080 {
         let hi = self.memory[(self.pc + 2) as usize];
 
         let offset = ((hi as u16) << 8) | (lo as u16);
-        self.a = self.memory[offset as usize];
+        self.registers[REG_A] = self.memory[offset as usize];
 
         self.pc += 3;
     }
@@ -596,7 +577,7 @@ impl Intel8080 {
     /// Condition bits affected: None
     fn op_ldax(&mut self) {
         let op = self.memory[self.pc as usize];
-        let reg_pair = op & 0b0001_0000;
+        let reg_pair = (op & 0b0001_0000) >> 4;
         match reg_pair {
             0b0 => {}
             0b1 => {
@@ -607,6 +588,7 @@ impl Intel8080 {
                 unreachable!("");
             }
         }
+        self.pc += 1;
     }
 
     /// Description: One byte of data is moved from the register specified by src to
@@ -629,6 +611,7 @@ impl Intel8080 {
         } else {
             self.registers[dst_reg as usize] = self.registers[src_reg as usize];
         }
+        self.pc += 1;
     }
 
     /// Description: If the Carry bit is 0, it is set to 1. If the Carry bit = 1,
@@ -636,12 +619,14 @@ impl Intel8080 {
     /// Condition bits affected: Carry
     fn op_cmc(&mut self) {
         self.cc.cy ^= 1;
+        self.pc += 1;
     }
 
     /// Description: The Carry bit is set to one
     /// Condition bits affected: Carry
     fn op_stc(&mut self) {
         self.cc.cy = 0x01;
+        self.pc += 1;
     }
 
     /// Description: The specified register or memory byte is incremented by one.
@@ -661,6 +646,7 @@ impl Intel8080 {
             self.update_flags(self.registers[reg as usize]);
             self.cc.cy = if carry { 1 } else { 0 };
         }
+        self.pc += 1;
     }
 
     /// Description: The specified register or memory byte is decremented by one.
@@ -681,6 +667,7 @@ impl Intel8080 {
             self.update_flags(self.registers[reg as usize]);
             self.cc.cy = 0;
         }
+        self.pc += 1;
     }
 
     /// Description: Each bit of the contents of the accumulator is
@@ -688,6 +675,7 @@ impl Intel8080 {
     /// Condition bits affected: None
     fn op_cma(&mut self) {
         self.registers[REG_A] = !self.registers[REG_A];
+        self.pc += 1;
     }
 
     /// The 16-bit number in the specified register pair is added
@@ -733,6 +721,7 @@ impl Intel8080 {
                 unreachable!();
             }
         }
+        self.pc += 1;
     }
 
     /// Description: The specified byte is logically ANDed bit by bit
@@ -751,6 +740,7 @@ impl Intel8080 {
         }
         self.update_flags(self.registers[REG_A]);
         self.cc.cy = 0;
+        self.pc += 1;
     }
 
     /// Description: The specified byte is EXCLUSIVE-ORed but by bit
@@ -773,6 +763,7 @@ impl Intel8080 {
         self.update_flags(self.registers[REG_A]);
         // TODO: update ac flag in the future? probably not gonna happen
         self.cc.cy = 0;
+        self.pc += 1;
     }
 
     /// Description: The contents of the specified register pair
@@ -817,6 +808,7 @@ impl Intel8080 {
             }
         }
         self.sp -= 2;
+        self.pc += 1;
     }
 
     /// Description: The contents of the specified register pair are
@@ -859,6 +851,7 @@ impl Intel8080 {
             }
         }
         self.sp += 2;
+        self.pc += 1;
     }
 
     /// Description: Program execution continues unconditionally
@@ -881,6 +874,7 @@ impl Intel8080 {
         if self.cc.z == 0 {
             self.pc = addr;
         }
+        self.pc += 1;
     }
 
     /// Description: The byte of immediate data is added to
@@ -894,7 +888,7 @@ impl Intel8080 {
         self.registers[REG_A] = sum;
         self.cc.cy = if carry { 1 } else { 0 };
         self.update_flags(self.registers[REG_A]);
-        self.pc += 1;
+        self.pc += 2;
     }
     /// Description: The byte of immediate data is logically
     /// to ANDed with the contents of the accumulator. The Carry bit
@@ -906,7 +900,7 @@ impl Intel8080 {
         self.registers[REG_A] = self.registers[REG_A] & imm_data;
         self.cc.cy = 0;
         self.update_flags(self.registers[REG_A]);
-        self.pc += 1;
+        self.pc += 2;
     }
 
     /// Description: The byte of immediate data is compared
@@ -918,7 +912,7 @@ impl Intel8080 {
         let (res, carry) = self.registers[REG_A].overflowing_sub(imm_data);
         self.update_flags(res);
         self.cc.cy = if carry { 1 } else { 0 };
-        self.pc += 1;
+        self.pc += 2;
     }
 
     /// Description: A call operation is unconditionally
@@ -950,7 +944,7 @@ impl Intel8080 {
     /// to output device number exp.
     /// Condition bits affected: None
     fn op_out(&mut self) {
-        let exp = self.memory[(self.pc + 1) as usize];
+        let _exp = self.memory[(self.pc + 1) as usize];
         // TODO:
         // IN and OUT are instructions that the 8080 hardware
         // used to talk to external hardware. For now, implement
@@ -965,6 +959,7 @@ impl Intel8080 {
     /// Condition bits afftected: None
     fn op_ei(&mut self) {
         self.interrupts_enable = true;
+        self.pc += 1;
     }
 
     /// Description: This instruction resets the INTE flip-flop
@@ -972,6 +967,7 @@ impl Intel8080 {
     /// Condition bits afftected: None
     fn op_di(&mut self) {
         self.interrupts_enable = true;
+        self.pc += 1;
     }
 
     /// Description: The 16 bits of data held in the H and L
@@ -985,5 +981,6 @@ impl Intel8080 {
         self.registers[REG_E] = self.registers[REG_L];
         self.registers[REG_H] = tmp1;
         self.registers[REG_L] = tmp2;
+        self.pc += 1;
     }
 }

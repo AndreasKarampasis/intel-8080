@@ -11,5 +11,9 @@ fn main() {
     rom.read_to_end(&mut buffer).unwrap();
     cpu.load(&buffer);
 
-    cpu.test();
+    while cpu.get_pc() < (buffer.len() as u16) {
+        cpu.tick();
+        // cpu.print_state();
+        println!("pc = {:#06x}", cpu.get_pc())
+    }
 }
