@@ -199,7 +199,7 @@ impl Intel8080 {
             0x26 => self.mvi(),
             0x27 => unimplemented!("Error: Unimplemented opcode."),
             0x28 => unimplemented!("Error: Unimplemented opcode."),
-            0x29 => unimplemented!("Error: Unimplemented opcode."),
+            0x29 => todo!("0x29 DAD H"),
             0x2a => unimplemented!("Error: Unimplemented opcode."),
             0x2b => unimplemented!("Error: Unimplemented opcode."),
             0x2c => unimplemented!("Error: Unimplemented opcode."),
@@ -209,7 +209,7 @@ impl Intel8080 {
 
             0x30 => unimplemented!("Error: Unimplemented opcode."),
             0x31 => self.lxi(),
-            0x32 => unimplemented!("Error: Unimplemented opcode."),
+            0x32 => todo!("sta addr"),
             0x33 => unimplemented!("Error: Unimplemented opcode."),
             0x34 => unimplemented!("Error: Unimplemented opcode."),
             0x35 => unimplemented!("Error: Unimplemented opcode."),
@@ -217,7 +217,7 @@ impl Intel8080 {
             0x37 => unimplemented!("Error: Unimplemented opcode."),
             0x38 => unimplemented!("Error: Unimplemented opcode."),
             0x39 => unimplemented!("Error: Unimplemented opcode."),
-            0x3a => unimplemented!("Error: Unimplemented opcode."),
+            0x3a => todo!("LDA adr"),
             0x3b => unimplemented!("Error: Unimplemented opcode."),
             0x3c => unimplemented!("Error: Unimplemented opcode."),
             0x3d => unimplemented!("Error: Unimplemented opcode."),
@@ -247,7 +247,7 @@ impl Intel8080 {
             0x53 => unimplemented!("Error: Unimplemented opcode."),
             0x54 => unimplemented!("Error: Unimplemented opcode."),
             0x55 => unimplemented!("Error: Unimplemented opcode."),
-            0x56 => unimplemented!("Error: Unimplemented opcode."),
+            0x56 => self.mov(),
             0x57 => unimplemented!("Error: Unimplemented opcode."),
             0x58 => unimplemented!("Error: Unimplemented opcode."),
             0x59 => unimplemented!("Error: Unimplemented opcode."),
@@ -255,7 +255,7 @@ impl Intel8080 {
             0x5b => unimplemented!("Error: Unimplemented opcode."),
             0x5c => unimplemented!("Error: Unimplemented opcode."),
             0x5d => unimplemented!("Error: Unimplemented opcode."),
-            0x5e => unimplemented!("Error: Unimplemented opcode."),
+            0x5e => self.mov(),
             0x5f => unimplemented!("Error: Unimplemented opcode."),
 
             0x60 => unimplemented!("Error: Unimplemented opcode."),
@@ -264,7 +264,7 @@ impl Intel8080 {
             0x63 => unimplemented!("Error: Unimplemented opcode."),
             0x64 => unimplemented!("Error: Unimplemented opcode."),
             0x65 => unimplemented!("Error: Unimplemented opcode."),
-            0x66 => unimplemented!("Error: Unimplemented opcode."),
+            0x66 => self.mov(),
             0x67 => unimplemented!("Error: Unimplemented opcode."),
             0x68 => unimplemented!("Error: Unimplemented opcode."),
             0x69 => unimplemented!("Error: Unimplemented opcode."),
@@ -273,7 +273,7 @@ impl Intel8080 {
             0x6c => unimplemented!("Error: Unimplemented opcode."),
             0x6d => unimplemented!("Error: Unimplemented opcode."),
             0x6e => unimplemented!("Error: Unimplemented opcode."),
-            0x6f => unimplemented!("Error: Unimplemented opcode."),
+            0x6f => self.mov(),
 
             0x70 => unimplemented!("Error: Unimplemented opcode."),
             0x71 => unimplemented!("Error: Unimplemented opcode."),
@@ -285,11 +285,11 @@ impl Intel8080 {
             0x77 => self.mov(),
             0x78 => unimplemented!("Error: Unimplemented opcode."),
             0x79 => unimplemented!("Error: Unimplemented opcode."),
-            0x7a => unimplemented!("Error: Unimplemented opcode."),
-            0x7b => unimplemented!("Error: Unimplemented opcode."),
-            0x7c => unimplemented!("Error: Unimplemented opcode."),
+            0x7a => self.mov(),
+            0x7b => self.mov(),
+            0x7c => self.mov(),
             0x7d => unimplemented!("Error: Unimplemented opcode."),
-            0x7e => unimplemented!("Error: Unimplemented opcode."),
+            0x7e => self.mov(),
             0x7f => unimplemented!("Error: Unimplemented opcode."),
 
             0x80 => unimplemented!("Error: Unimplemented opcode."),
@@ -369,7 +369,7 @@ impl Intel8080 {
             0xc6 => unimplemented!("Error: Unimplemented opcode."),
             0xc7 => unimplemented!("Error: Unimplemented opcode."),
             0xc8 => unimplemented!("Error: Unimplemented opcode."),
-            0xc9 => unimplemented!("Error: Unimplemented opcode."),
+            0xc9 => self.ret(),
             0xca => unimplemented!("Error: Unimplemented opcode."),
             0xcb => unimplemented!("Error: Unimplemented opcode."),
             0xcc => unimplemented!("Error: Unimplemented opcode."),
@@ -412,20 +412,20 @@ impl Intel8080 {
             0xef => unimplemented!("Error: Unimplemented opcode."),
 
             0xf0 => unimplemented!("Error: Unimplemented opcode."),
-            0xf1 => unimplemented!("Error: Unimplemented opcode."),
+            0xf1 => todo!("POP PSW"),
             0xf2 => unimplemented!("Error: Unimplemented opcode."),
             0xf3 => unimplemented!("Error: Unimplemented opcode."),
             0xf4 => unimplemented!("Error: Unimplemented opcode."),
-            0xf5 => unimplemented!("Error: Unimplemented opcode."),
+            0xf5 => todo!("PUSH PSW"),
             0xf6 => unimplemented!("Error: Unimplemented opcode."),
             0xf7 => unimplemented!("Error: Unimplemented opcode."),
             0xf8 => unimplemented!("Error: Unimplemented opcode."),
             0xf9 => unimplemented!("Error: Unimplemented opcode."),
             0xfa => unimplemented!("Error: Unimplemented opcode."),
-            0xfb => unimplemented!("Error: Unimplemented opcode."),
+            0xfb => todo!("EI"),
             0xfc => unimplemented!("Error: Unimplemented opcode."),
             0xfd => unimplemented!("Error: Unimplemented opcode."),
-            0xfe => unimplemented!("Error: Unimplemented opcode."),
+            0xfe => self.cpi(),
             0xff => unimplemented!("Error: Unimplemented opcode."),
         }
     }
@@ -607,6 +607,17 @@ impl Intel8080 {
         self.pc += 1;
     }
 
+    /// Description: A return operation is unconditionally performed.
+    /// Condition bits affected: None
+    fn ret(&mut self) {
+        let hi_addr: u16 = self.memory[self.sp as usize] as u16;
+        let lo_addr: u16 = self.memory[(self.sp + 1) as usize] as u16;
+        let addr: u16 = (hi_addr << 8) | lo_addr;
+        // println!("returing to addr := {:#06x}", addr);
+        self.sp += 2;
+        self.pc = addr;
+    }
+
     /// Description: A call operation is unconditionally performed
     /// to subroutine sub.
     /// Condition bits affected: None
@@ -621,5 +632,32 @@ impl Intel8080 {
         self.memory[(self.sp - 2) as usize] = hi_ret_addr;
         self.sp -= 2;
         self.pc = addr;
+    }
+
+    /// Description: The byte of immediate data is compared
+    /// to the contents of the accumulator. The comparison is
+    /// performed by internally subtracting the data from the
+    /// accumulator using two's complement arithmetic, leaving
+    /// the accumulator unchanged but setting the condition bits
+    /// by the result. In particular, the zero bit is set if the
+    /// quantities are equal, and reset if they are unequal.
+    fn cpi(&mut self) {
+        let data = self.memory[(self.pc + 1) as usize];
+        let (result, borrow_out) = self.registers[REG_A].overflowing_sub(data);
+        self.cc.cy = if borrow_out { 1 } else { 0 };
+        self.update_flags(result);
+        self.pc += 2;
+    }
+
+    /// Description: The carry bit is set equal to the low-order
+    /// bit of the accumulator. THe contents of the accumulator are
+    /// rotated one bit position to the right, with the low-order bit
+    /// being transferred to the high-order bit position of the
+    /// accumulator
+    fn rrc(&mut self) {
+        self.cc.cy = self.registers[REG_A] & 0x0000_0001;
+        println!("{:#06x}", self.registers[REG_A]);
+        self.registers[REG_A] = self.registers[REG_A].rotate_right(1);
+        println!("{:#06x}", self.registers[REG_A]);
     }
 }

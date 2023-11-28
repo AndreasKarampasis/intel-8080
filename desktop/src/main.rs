@@ -12,12 +12,16 @@ fn main() {
     rom.read_to_end(&mut buffer).unwrap();
     cpu.load(&buffer);
     let mut guess = String::new();
-
+    let mut i = 0;
     while cpu.get_pc() < (buffer.len() as u16) {
+        /*
         io::stdin()
             .read_line(&mut guess)
             .expect("Failed to read line");
+            */
+        i += 1;
         cpu.print_state();
         cpu.tick();
+        println!("{}", i);
     }
 }
