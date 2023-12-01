@@ -365,7 +365,7 @@ impl Intel8080 {
             0xc2 => self.jnz(),
             0xc3 => self.jmp(),
             0xc4 => unimplemented!("Error: Unimplemented opcode."),
-            0xc5 => unimplemented!("Error: Unimplemented opcode."),
+            0xc5 => self.push(),
             0xc6 => unimplemented!("Error: Unimplemented opcode."),
             0xc7 => unimplemented!("Error: Unimplemented opcode."),
             0xc8 => unimplemented!("Error: Unimplemented opcode."),
@@ -382,7 +382,7 @@ impl Intel8080 {
             0xd2 => unimplemented!("Error: Unimplemented opcode."),
             0xd3 => unimplemented!("Error: Unimplemented opcode."),
             0xd4 => unimplemented!("Error: Unimplemented opcode."),
-            0xd5 => unimplemented!("Error: Unimplemented opcode."),
+            0xd5 => self.push(),
             0xd6 => unimplemented!("Error: Unimplemented opcode."),
             0xd7 => unimplemented!("Error: Unimplemented opcode."),
             0xd8 => unimplemented!("Error: Unimplemented opcode."),
@@ -399,7 +399,7 @@ impl Intel8080 {
             0xe2 => unimplemented!("Error: Unimplemented opcode."),
             0xe3 => unimplemented!("Error: Unimplemented opcode."),
             0xe4 => unimplemented!("Error: Unimplemented opcode."),
-            0xe5 => unimplemented!("Error: Unimplemented opcode."),
+            0xe5 => self.push(),
             0xe6 => unimplemented!("Error: Unimplemented opcode."),
             0xe7 => unimplemented!("Error: Unimplemented opcode."),
             0xe8 => unimplemented!("Error: Unimplemented opcode."),
@@ -416,7 +416,7 @@ impl Intel8080 {
             0xf2 => unimplemented!("Error: Unimplemented opcode."),
             0xf3 => unimplemented!("Error: Unimplemented opcode."),
             0xf4 => unimplemented!("Error: Unimplemented opcode."),
-            0xf5 => todo!("PUSH PSW"),
+            0xf5 => self.push(),
             0xf6 => unimplemented!("Error: Unimplemented opcode."),
             0xf7 => unimplemented!("Error: Unimplemented opcode."),
             0xf8 => unimplemented!("Error: Unimplemented opcode."),
@@ -642,11 +642,62 @@ impl Intel8080 {
     /// by the result. In particular, the zero bit is set if the
     /// quantities are equal, and reset if they are unequal.
     fn cpi(&mut self) {
-        let data = self.memory[(self.pc + 1) as usize];
+        let data: u8 = self.memory[(self.pc + 1) as usize];
         let (result, borrow_out) = self.registers[REG_A].overflowing_sub(data);
         self.cc.cy = if borrow_out { 1 } else { 0 };
         self.update_flags(result);
         self.pc += 2;
+    }
+
+    /// Description: The contents of the specified register pair
+    /// are saved in two bytes of memory indicated by the stack
+    /// pointer SP.
+    /// The contents of the first register are saved at the mem-
+    /// ory address one less than the address indicated by the stack
+    /// pointer; the contents of the second register are saved at the
+    /// address two less than the address indicated by the stack
+    /// pointer. If register pair PSW is specified, the first byte of in-
+    /// formation saved holds the contents of the A register; the
+    /// second byte holds the settings of the five condition bits,
+    /// i.e., Carry, Zero, Sign, Parity, and Auxiliary Carry. The for-
+    /// mat of this byte is
+    /// 7 6 5  4 3 2 1 0
+    /// S Z 0 AC 0 P 1 C
+    /// Condition bits affected: None
+    fn push(&mut self) {
+        let instruction: u8 = self.memory[self.pc as usize];
+        let rp = (instruction & 0b0011_0000) >> 4;
+        match rp {
+            0b00 => {
+                self.memory[(self.sp - 1) as usize] = self.registers[REG_B];
+                self.memory[(self.sp - 2) as usize] = self.registers[REG_C];
+            }
+            0b01 => {
+                self.memory[(self.sp - 1) as usize] = self.registers[REG_D];
+                self.memory[(self.sp - 2) as usize] = self.registers[REG_E];
+            }
+            0b10 => {
+                self.memory[(self.sp - 1) as usize] = self.registers[REG_H];
+                self.memory[(self.sp - 2) as usize] = self.registers[REG_L];
+            }
+            0b11 => {
+                self.memory[(self.sp - 1) as usize] = self.registers[REG_A];
+                let mut psw: u8 = 0b0000_0010;
+                psw = psw | (self.cc.cy);
+                psw = psw | (self.cc.p << 2);
+                psw = psw | (self.cc.ac << 4);
+                psw = psw | (self.cc.z << 6);
+                psw = psw | (self.cc.s << 7);
+                println!("{:#06x}", psw);
+                self.memory[(self.sp - 2) as usize] = psw;
+                unimplemented!("push");
+            }
+            _ => {
+                unreachable!("push");
+            }
+        }
+        self.sp -= 2;
+        self.pc += 1;
     }
 
     /// Description: The carry bit is set equal to the low-order
