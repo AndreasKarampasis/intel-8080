@@ -25,7 +25,7 @@ pub struct Intel8080 {
     pc: u16,
     sp: u16,
     cc: ConditionCodes,
-    //interrupts_enable: bool,
+    interrupts_enable: bool,
 }
 
 impl ConditionCodes {
@@ -48,8 +48,6 @@ fn is_parity_even(byte: u8) -> bool {
             count += 1;
         }
     }
-    println!("{}", count);
-
     (count % 2) == 0
 }
 
@@ -61,7 +59,7 @@ impl Intel8080 {
             pc: 0,
             sp: 0,
             cc: ConditionCodes::new(),
-            //interrupts_enable: false,
+            interrupts_enable: false,
         }
     }
 
@@ -211,7 +209,7 @@ impl Intel8080 {
 
             0x30 => unimplemented!("Error: Unimplemented opcode."),
             0x31 => self.lxi(),
-            0x32 => todo!("sta addr"),
+            0x32 => self.sta(),
             0x33 => unimplemented!("Error: Unimplemented opcode."),
             0x34 => unimplemented!("Error: Unimplemented opcode."),
             0x35 => unimplemented!("Error: Unimplemented opcode."),
@@ -219,7 +217,7 @@ impl Intel8080 {
             0x37 => unimplemented!("Error: Unimplemented opcode."),
             0x38 => unimplemented!("Error: Unimplemented opcode."),
             0x39 => unimplemented!("Error: Unimplemented opcode."),
-            0x3a => todo!("LDA adr"),
+            0x3a => self.lda(),
             0x3b => unimplemented!("Error: Unimplemented opcode."),
             0x3c => unimplemented!("Error: Unimplemented opcode."),
             0x3d => unimplemented!("Error: Unimplemented opcode."),
@@ -335,7 +333,7 @@ impl Intel8080 {
             0xa4 => unimplemented!("Error: Unimplemented opcode."),
             0xa5 => unimplemented!("Error: Unimplemented opcode."),
             0xa6 => unimplemented!("Error: Unimplemented opcode."),
-            0xa7 => unimplemented!("Error: Unimplemented opcode."),
+            0xa7 => self.ana(),
             0xa8 => unimplemented!("Error: Unimplemented opcode."),
             0xa9 => unimplemented!("Error: Unimplemented opcode."),
             0xaa => unimplemented!("Error: Unimplemented opcode."),
@@ -343,7 +341,7 @@ impl Intel8080 {
             0xac => unimplemented!("Error: Unimplemented opcode."),
             0xad => unimplemented!("Error: Unimplemented opcode."),
             0xae => unimplemented!("Error: Unimplemented opcode."),
-            0xaf => unimplemented!("Error: Unimplemented opcode."),
+            0xaf => self.xra(),
 
             0xb0 => unimplemented!("Error: Unimplemented opcode."),
             0xb1 => unimplemented!("Error: Unimplemented opcode."),
@@ -424,7 +422,7 @@ impl Intel8080 {
             0xf8 => unimplemented!("Error: Unimplemented opcode."),
             0xf9 => unimplemented!("Error: Unimplemented opcode."),
             0xfa => unimplemented!("Error: Unimplemented opcode."),
-            0xfb => todo!("EI"),
+            0xfb => self.ei(),
             0xfc => unimplemented!("Error: Unimplemented opcode."),
             0xfd => unimplemented!("Error: Unimplemented opcode."),
             0xfe => self.cpi(),
@@ -445,6 +443,28 @@ impl Intel8080 {
         // self.cc.s = if 0x80 == (result & 0x80) { 1 } else { 0 };
         // self.cc.p = is_parity_even(result);
         self.registers[reg] = result;
+        self.pc += 1;
+    }
+
+    /// Description: The specified byte is lofically ANDed bit
+    /// by bit with the contents of the accumulator. The Carry bit
+    /// is reset to zero.
+    /// Condition bits affected: Carry, Zero, Sign, Parity,
+    fn ana(&mut self) {
+        let instruction = self.memory[self.pc as usize];
+        let reg = instruction & 0b0000_0111;
+        match reg {
+            M_REF => {
+                let offset: u16 =
+                    ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+                self.registers[REG_A] &= self.memory[offset as usize];
+            }
+            _ => {
+                self.registers[REG_A] &= self.registers[reg as usize];
+            }
+        }
+        self.update_flags(self.registers[REG_A]);
+        self.cc.cy = 0;
         self.pc += 1;
     }
 
@@ -530,6 +550,30 @@ impl Intel8080 {
             self.registers[dst as usize] = self.registers[src as usize];
         }
         self.pc += 1;
+    }
+
+    /// Description: The contents of the accumulator replace
+    /// the byte at the memory address formed by concatenating
+    /// HI ADD with LOW ADD.
+    /// Condition bits affected: None
+    fn sta(&mut self) {
+        let low_data: u16 = self.memory[(self.pc + 1) as usize] as u16;
+        let hi_data: u16 = self.memory[(self.pc + 2) as usize] as u16;
+        let offset: usize = ((hi_data << 8) | low_data) as usize;
+        self.memory[offset] = self.registers[REG_A];
+        self.pc += 3;
+    }
+
+    /// Description: The byte at the memory address formed
+    /// by concatenating HI ADD with LOW ADD replaces the
+    /// contents of the accumulator.
+    /// Condition bits affected: None
+    fn lda(&mut self) {
+        let low_data: u16 = self.memory[(self.pc + 1) as usize] as u16;
+        let hi_data: u16 = self.memory[(self.pc + 2) as usize] as u16;
+        let offset: usize = ((hi_data << 8) | low_data) as usize;
+        self.registers[REG_A] = self.memory[offset];
+        self.pc += 3;
     }
 
     /// Description: The contents of the memory location
@@ -848,5 +892,36 @@ impl Intel8080 {
         self.cc.cy = 0;
         self.update_flags(result);
         self.pc += 2;
+    }
+
+    /// Description: The specified byte is EXCLUSIVE-ORed
+    /// bit by bit with the contents of the acuumulator.
+    /// The Carry bit is reset to zero.
+    /// Considion bits affected: Carry, Zero, Sign, Parity
+    /// Auxiliary Carry
+    fn xra(&mut self) {
+        let instruction = self.memory[self.pc as usize];
+        let reg = instruction & 0b0000_0111;
+        match reg {
+            M_REF => {
+                let offset: u16 =
+                    ((self.registers[REG_H] as u16) << 8) | (self.registers[REG_L] as u16);
+                self.registers[REG_A] ^= self.memory[offset as usize];
+            }
+            _ => {
+                self.registers[REG_A] ^= self.registers[reg as usize];
+            }
+        }
+        self.update_flags(self.registers[REG_A]);
+        self.cc.cy = 0;
+        self.pc += 1;
+    }
+
+    /// Description: This instruction sets the INTE flip-flop,
+    /// enabling the CPU to recognise and respond to interrupts.
+    /// Condition bits affected: None
+    fn ei(&mut self) {
+        self.interrupts_enable = true;
+        self.pc += 1;
     }
 }
