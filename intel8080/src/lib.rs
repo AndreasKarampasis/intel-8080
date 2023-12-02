@@ -25,7 +25,7 @@ pub struct Intel8080 {
     pc: u16,
     sp: u16,
     cc: ConditionCodes,
-    interrupts_enable: bool,
+    //interrupts_enable: bool,
 }
 
 impl ConditionCodes {
@@ -48,6 +48,8 @@ fn is_parity_even(byte: u8) -> bool {
             count += 1;
         }
     }
+    println!("{}", count);
+
     (count % 2) == 0
 }
 
@@ -59,7 +61,7 @@ impl Intel8080 {
             pc: 0,
             sp: 0,
             cc: ConditionCodes::new(),
-            interrupts_enable: false,
+            //interrupts_enable: false,
         }
     }
 
@@ -165,13 +167,13 @@ impl Intel8080 {
             0x06 => self.mvi(),
             0x07 => unimplemented!("Error: Unimplemented opcode."),
             0x08 => unimplemented!("Error: Unimplemented opcode."),
-            0x09 => todo!("0x09 dad B"),
+            0x09 => self.dad(),
             0x0a => unimplemented!("Error: Unimplemented opcode."),
             0x0b => unimplemented!("Error: Unimplemented opcode."),
             0x0c => unimplemented!("Error: Unimplemented opcode."),
             0x0d => self.dcr(),
             0x0e => self.mvi(),
-            0x0f => todo!("0x0f RRC"),
+            0x0f => self.rrc(),
 
             0x10 => unimplemented!("Error: Unimplemented opcode."),
             0x11 => self.lxi(),
@@ -182,7 +184,7 @@ impl Intel8080 {
             0x16 => unimplemented!("Error: Unimplemented opcode."),
             0x17 => unimplemented!("Error: Unimplemented opcode."),
             0x18 => unimplemented!("Error: Unimplemented opcode."),
-            0x19 => todo!("0x19 dad d"),
+            0x19 => self.dad(),
             0x1a => self.ldax(),
             0x1b => unimplemented!("Error: Unimplemented opcode."),
             0x1c => unimplemented!("Error: Unimplemented opcode."),
@@ -199,7 +201,7 @@ impl Intel8080 {
             0x26 => self.mvi(),
             0x27 => unimplemented!("Error: Unimplemented opcode."),
             0x28 => unimplemented!("Error: Unimplemented opcode."),
-            0x29 => todo!("0x29 DAD H"),
+            0x29 => self.dad(),
             0x2a => unimplemented!("Error: Unimplemented opcode."),
             0x2b => unimplemented!("Error: Unimplemented opcode."),
             0x2c => unimplemented!("Error: Unimplemented opcode."),
@@ -361,12 +363,12 @@ impl Intel8080 {
             0xbf => unimplemented!("Error: Unimplemented opcode."),
 
             0xc0 => unimplemented!("Error: Unimplemented opcode."),
-            0xc1 => unimplemented!("Error: Unimplemented opcode."),
+            0xc1 => self.pop(),
             0xc2 => self.jnz(),
             0xc3 => self.jmp(),
             0xc4 => unimplemented!("Error: Unimplemented opcode."),
             0xc5 => self.push(),
-            0xc6 => unimplemented!("Error: Unimplemented opcode."),
+            0xc6 => self.adi(),
             0xc7 => unimplemented!("Error: Unimplemented opcode."),
             0xc8 => unimplemented!("Error: Unimplemented opcode."),
             0xc9 => self.ret(),
@@ -378,9 +380,9 @@ impl Intel8080 {
             0xcf => unimplemented!("Error: Unimplemented opcode."),
 
             0xd0 => unimplemented!("Error: Unimplemented opcode."),
-            0xd1 => unimplemented!("Error: Unimplemented opcode."),
+            0xd1 => self.pop(),
             0xd2 => unimplemented!("Error: Unimplemented opcode."),
-            0xd3 => unimplemented!("Error: Unimplemented opcode."),
+            0xd3 => self.out(),
             0xd4 => unimplemented!("Error: Unimplemented opcode."),
             0xd5 => self.push(),
             0xd6 => unimplemented!("Error: Unimplemented opcode."),
@@ -395,24 +397,24 @@ impl Intel8080 {
             0xdf => unimplemented!("Error: Unimplemented opcode."),
 
             0xe0 => unimplemented!("Error: Unimplemented opcode."),
-            0xe1 => unimplemented!("Error: Unimplemented opcode."),
+            0xe1 => self.pop(),
             0xe2 => unimplemented!("Error: Unimplemented opcode."),
             0xe3 => unimplemented!("Error: Unimplemented opcode."),
             0xe4 => unimplemented!("Error: Unimplemented opcode."),
             0xe5 => self.push(),
-            0xe6 => unimplemented!("Error: Unimplemented opcode."),
+            0xe6 => self.ani(),
             0xe7 => unimplemented!("Error: Unimplemented opcode."),
             0xe8 => unimplemented!("Error: Unimplemented opcode."),
             0xe9 => unimplemented!("Error: Unimplemented opcode."),
             0xea => unimplemented!("Error: Unimplemented opcode."),
-            0xeb => unimplemented!("Error: Unimplemented opcode."),
+            0xeb => self.xchg(),
             0xec => unimplemented!("Error: Unimplemented opcode."),
             0xed => unimplemented!("Error: Unimplemented opcode."),
             0xee => unimplemented!("Error: Unimplemented opcode."),
             0xef => unimplemented!("Error: Unimplemented opcode."),
 
             0xf0 => unimplemented!("Error: Unimplemented opcode."),
-            0xf1 => todo!("POP PSW"),
+            0xf1 => self.pop(),
             0xf2 => unimplemented!("Error: Unimplemented opcode."),
             0xf3 => unimplemented!("Error: Unimplemented opcode."),
             0xf4 => unimplemented!("Error: Unimplemented opcode."),
@@ -659,10 +661,7 @@ impl Intel8080 {
     /// pointer. If register pair PSW is specified, the first byte of in-
     /// formation saved holds the contents of the A register; the
     /// second byte holds the settings of the five condition bits,
-    /// i.e., Carry, Zero, Sign, Parity, and Auxiliary Carry. The for-
-    /// mat of this byte is
-    /// 7 6 5  4 3 2 1 0
-    /// S Z 0 AC 0 P 1 C
+    /// i.e., Carry, Zero, Sign, Parity, and Auxiliary Carry.
     /// Condition bits affected: None
     fn push(&mut self) {
         let instruction: u8 = self.memory[self.pc as usize];
@@ -688,9 +687,7 @@ impl Intel8080 {
                 psw = psw | (self.cc.ac << 4);
                 psw = psw | (self.cc.z << 6);
                 psw = psw | (self.cc.s << 7);
-                println!("{:#06x}", psw);
                 self.memory[(self.sp - 2) as usize] = psw;
-                unimplemented!("push");
             }
             _ => {
                 unreachable!("push");
@@ -700,15 +697,156 @@ impl Intel8080 {
         self.pc += 1;
     }
 
+    /// Description: The contents of the specified register pair
+    /// are restored from two bytes of memory indicated by the
+    /// stack pointer SP. The byte of data at the memory address
+    /// indicated by the stack pointer is load into the second
+    /// register of the register pair; the byte of data at the address
+    /// one greater than the address indicated by the stck pointer
+    /// is loaded into the first register of the pair. If register pair
+    /// PSW is specivified, the byte of data indicated by the contents
+    /// of the stack pointer plus one is used to restore the values of
+    /// the five condition bits.
+    /// Condition bits affected: If register PSW is specified. Carry,
+    /// Sign, Zero, Parity, and Auxiliary Carry may be changed.
+    /// Otherwise, none are affected.
+    fn pop(&mut self) {
+        let instruction: u8 = self.memory[self.pc as usize];
+        let rp = (instruction & 0b0011_0000) >> 4;
+        match rp {
+            0b00 => {
+                self.registers[REG_B] = self.memory[(self.sp + 1) as usize];
+                self.registers[REG_C] = self.memory[self.sp as usize];
+            }
+            0b01 => {
+                self.registers[REG_D] = self.memory[(self.sp + 1) as usize];
+                self.registers[REG_E] = self.memory[self.sp as usize];
+            }
+            0b10 => {
+                self.registers[REG_H] = self.memory[(self.sp + 1) as usize];
+                self.registers[REG_L] = self.memory[self.sp as usize];
+            }
+            0b11 => {
+                self.registers[REG_A] = self.memory[(self.sp + 1) as usize];
+                let psw = self.memory[self.sp as usize];
+                self.cc.cy = psw & 0b0000_0001;
+                self.cc.p = (psw & 0b0000_0100) >> 2;
+                self.cc.ac = (psw & 0b0001_0000) >> 4;
+                self.cc.z = (psw & 0b0100_0000) >> 6;
+                self.cc.s = (psw & 0b1000_0000) >> 7;
+            }
+            _ => {
+                unreachable!("push");
+            }
+        }
+        self.sp += 2;
+        self.pc += 1;
+    }
+
+    /// Description: The 16-bit number in the specified register
+    /// pair is added to the 16-bit number help in the H and L
+    /// registers using two's complement arithmetic. The result
+    /// replaces the contents of the H and L registers.
+    /// Condition bits affected: Carry
+    fn dad(&mut self) {
+        let instruction: u8 = self.memory[self.pc as usize];
+        let rp: u8 = (instruction & 0b0011_0000) >> 4;
+        match rp {
+            0b00 => {
+                let bc: u16 = (self.registers[REG_B] as u16) << 8 | (self.registers[REG_C] as u16);
+                let hl: u16 = (self.registers[REG_H] as u16) << 8 | (self.registers[REG_L] as u16);
+                let (result, overflow_flag) = hl.overflowing_add(bc);
+                self.cc.cy = if overflow_flag { 1 } else { 0 };
+                self.registers[REG_H] = ((result & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (result & 0x00FF) as u8;
+            }
+            0b01 => {
+                let de: u16 = (self.registers[REG_D] as u16) << 8 | (self.registers[REG_E] as u16);
+                let hl: u16 = (self.registers[REG_H] as u16) << 8 | (self.registers[REG_L] as u16);
+                let (result, overflow_flag) = hl.overflowing_add(de);
+                self.cc.cy = if overflow_flag { 1 } else { 0 };
+                self.registers[REG_H] = ((result & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (result & 0x00FF) as u8;
+            }
+            0b10 => {
+                let hl: u16 = (self.registers[REG_H] as u16) << 8 | (self.registers[REG_L] as u16);
+                let (result, overflow_flag) = hl.overflowing_add(hl);
+                self.cc.cy = if overflow_flag { 1 } else { 0 };
+                self.registers[REG_H] = ((result & 0xFF00) >> 8) as u8;
+                self.registers[REG_L] = (result & 0x00FF) as u8;
+            }
+            0b11 => {
+                let hl: u16 = (self.registers[REG_H] as u16) << 8 | (self.registers[REG_L] as u16);
+                let (result, overflow_flag) = self.sp.overflowing_add(hl);
+                self.sp = result;
+                self.cc.cy = if overflow_flag { 1 } else { 0 };
+            }
+            _ => {
+                unreachable!("dad");
+            }
+        }
+        self.pc += 1;
+    }
+
+    /// Description: The 16-bit number held in the H and L
+    /// registers are exchanged with the 16 bits of data
+    /// held in the D and E registers.
+    /// Condition bits affected: None.
+    fn xchg(&mut self) {
+        let d_prev = self.registers[REG_D];
+        let e_prev = self.registers[REG_E];
+        self.registers[REG_D] = self.registers[REG_H];
+        self.registers[REG_E] = self.registers[REG_L];
+        self.registers[REG_H] = d_prev;
+        self.registers[REG_L] = e_prev;
+        self.pc += 1;
+    }
+
+    /// Description: The contents of the accumulator are sent
+    /// to output device number exp.
+    /// Condition bits affected: None
+    fn out(&mut self) {
+        // let exp = self.memory[(self.pc + 1) as usize];
+        // TODO: It just skips over the data for now :)
+        self.pc += 2;
+    }
+
     /// Description: The carry bit is set equal to the low-order
     /// bit of the accumulator. THe contents of the accumulator are
     /// rotated one bit position to the right, with the low-order bit
     /// being transferred to the high-order bit position of the
     /// accumulator
+    /// Condition bits affected: Carry
     fn rrc(&mut self) {
         self.cc.cy = self.registers[REG_A] & 0x0000_0001;
-        println!("{:#06x}", self.registers[REG_A]);
         self.registers[REG_A] = self.registers[REG_A].rotate_right(1);
-        println!("{:#06x}", self.registers[REG_A]);
+        self.pc += 1;
+    }
+
+    /// Description: The byte of immediate data is added to
+    /// the contents of the accumulator ussing two's complement
+    /// arithmetic.
+    /// Condition bits affected: Carry, Sign, Zero, Parity,
+    /// Auxiliary Carry
+    fn adi(&mut self) {
+        let data = self.memory[(self.pc + 1) as usize];
+        let (result, overflow_flag) = self.registers[REG_A].overflowing_add(data);
+        self.registers[REG_A] = result;
+        self.cc.cy = if overflow_flag { 1 } else { 0 };
+        self.update_flags(result);
+        self.pc += 2;
+    }
+
+    /// Description: The byte of immediate data is lofically
+    /// ANDed with the contents of the accumulator. The Carry
+    /// bit is reset to zero.
+    /// Condition bits affected: Carry, Zero, Sign, Parity
+    fn ani(&mut self) {
+        let data = self.memory[(self.pc + 1) as usize];
+        let result: u8 = self.registers[REG_A] & data;
+        self.registers[REG_A] = result;
+        self.cc.cy = 0;
+        self.update_flags(result);
+        self.pc += 2;
     }
 }

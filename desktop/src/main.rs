@@ -1,7 +1,7 @@
 use intel8080::*;
 use std::env;
 use std::fs::File;
-use std::io;
+// use std::io;
 use std::io::Read;
 fn main() {
     let args: Vec<_> = env::args().collect();
@@ -11,7 +11,7 @@ fn main() {
 
     rom.read_to_end(&mut buffer).unwrap();
     cpu.load(&buffer);
-    let mut guess = String::new();
+    // let mut guess = String::new();
     let mut i = 0;
     while cpu.get_pc() < (buffer.len() as u16) {
         /*
